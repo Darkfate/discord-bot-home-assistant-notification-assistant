@@ -505,6 +505,69 @@ export class Database {
     });
   }
 
+  async queryNotifications(options: {
+    status?: string;
+    source?: string;
+    search?: string;
+    limit: number;
+    offset: number;
+    sort?: string;
+    order?: 'ASC' | 'DESC';
+  }): Promise<{ notifications: QueuedNotification[]; total: number; page: number; limit: number }> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const { status, source, search, limit, offset, sort = 'created_at', order = 'DESC' } = options;
+
+    let query = 'SELECT * FROM notifications WHERE 1=1';
+    const params: any[] = [];
+
+    if (status) {
+      query += ' AND status = ?';
+      params.push(status);
+    }
+
+    if (source) {
+      query += ' AND source = ?';
+      params.push(source);
+    }
+
+    if (search) {
+      query += ' AND (message LIKE ? OR title LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    // Count query for total
+    const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as count');
+
+    // Get total count
+    const total = await new Promise<number>((resolve, reject) => {
+      this.db!.get(countQuery, params, (err, row: any) => {
+        if (err) reject(err);
+        else resolve(row.count);
+      });
+    });
+
+    // Add sorting and pagination
+    const sortColumn = ['created_at', 'scheduled_for', 'sent_at', 'status'].includes(sort) ? sort : 'created_at';
+    query += ` ORDER BY ${sortColumn} ${order} LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+
+    // Get notifications
+    const notifications = await new Promise<QueuedNotification[]>((resolve, reject) => {
+      this.db!.all(query, params, (err, rows: any[]) => {
+        if (err) reject(err);
+        else resolve(rows.map(row => this.rowToQueuedNotification(row)));
+      });
+    });
+
+    return {
+      notifications,
+      total,
+      page: Math.floor(offset / limit) + 1,
+      limit,
+    };
+  }
+
   // ============================================================================
   // Helper Methods
   // ============================================================================
