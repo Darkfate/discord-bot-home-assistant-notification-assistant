@@ -81,14 +81,14 @@ async function main() {
     await database.initialize();
 
     // Initialize queue
-    queue = new NotificationQueue(client, database, CHANNEL_ID);
+    queue = new NotificationQueue(client, database, CHANNEL_ID!);
 
     // Initialize command handler
     commandHandler = new CommandHandler(client, database, queue);
 
     // Login to Discord
     console.log('Connecting to Discord...');
-    await client.login(TOKEN);
+    await client.login(TOKEN!);
   } catch (error) {
     console.error('Failed to start bot:', error);
     process.exit(1);
