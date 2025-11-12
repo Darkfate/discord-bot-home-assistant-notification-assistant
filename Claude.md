@@ -73,7 +73,63 @@ export default {
 
 ### Testing Standards
 
-#### 1. What to Test
+#### 1. Test for Correctness, Not Just Coverage
+
+**CRITICAL: Tests must verify expected behavior, not just exist to increase coverage metrics.**
+
+**Good tests:**
+- ✅ Define clear expected behavior and verify it
+- ✅ Test specific inputs produce specific outputs
+- ✅ Verify error conditions throw expected errors with correct messages
+- ✅ Can fail when the code is incorrect
+- ✅ Have meaningful assertions that actually validate something
+
+**Bad tests to AVOID:**
+- ❌ `expect(true).toBe(true)` - Tautologies that always pass
+- ❌ `expect(error).toBeDefined()` in a catch block - Always passes since catch only runs on error
+- ❌ Tests that accept any outcome as valid
+- ❌ Tests that can never fail
+- ❌ Tests written just to hit coverage thresholds
+- ❌ Try-catch blocks where both success and failure are considered valid
+
+**Example of a BAD test:**
+```typescript
+// ❌ BAD - This test provides no value
+it('should handle errors gracefully', async () => {
+  try {
+    await riskyOperation();
+    expect(true).toBe(true); // Always passes
+  } catch (error) {
+    expect(error).toBeDefined(); // Always passes in catch block
+  }
+});
+```
+
+**Example of a GOOD test:**
+```typescript
+// ✅ GOOD - Clear expectation of behavior
+it('should throw DatabaseError when connection fails', async () => {
+  await expect(database.initialize('/invalid/path'))
+    .rejects
+    .toThrow('Database connection failed');
+});
+
+// ✅ GOOD - Tests specific behavior
+it('should return null when user not found', async () => {
+  const result = await database.getUserById(999);
+  expect(result).toBeNull();
+});
+```
+
+**Before writing any test, ask yourself:**
+1. What specific behavior am I testing?
+2. What is the expected outcome?
+3. Could this test ever fail if the code is wrong?
+4. Am I testing actual behavior or just writing code that always passes?
+
+**If a test can't fail, delete it. It's worse than no test because it creates false confidence.**
+
+#### 2. What to Test
 
 **Every feature MUST have:**
 
@@ -89,7 +145,7 @@ export default {
 - **Verify all tests pass** - Ensure modifications don't break existing tests
 - **Increase coverage** - Add tests for previously uncovered code paths if applicable
 
-#### 2. Test Organization
+#### 3. Test Organization
 
 ```
 project/
@@ -105,7 +161,7 @@ project/
     └── webhook.test.ts
 ```
 
-#### 3. Test Naming Convention
+#### 4. Test Naming Convention
 
 - Test files: `[feature].test.ts` or `[feature].spec.ts`
 - Test descriptions: Use descriptive names that explain what is being tested
@@ -128,7 +184,7 @@ describe('NotificationQueue', () => {
 });
 ```
 
-#### 4. Mocking External Dependencies
+#### 5. Mocking External Dependencies
 
 Always mock external services:
 
@@ -143,13 +199,17 @@ jest.mock('../src/database');
 jest.mock('node-fetch');
 ```
 
-#### 5. Test Coverage Requirements
+#### 6. Test Coverage Requirements
+
+**Coverage is a side-effect of good tests, not the goal.**
 
 - **Minimum 70% coverage** for all new code
 - **100% coverage** for critical paths (authentication, data persistence, notifications)
 - Run `npm run test:coverage` to check coverage
 
-#### 6. Example Test Structure
+**IMPORTANT**: Never write meaningless tests just to hit coverage numbers. A single good test that verifies behavior is better than ten tests with `expect(true).toBe(true)`.
+
+#### 7. Example Test Structure
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';

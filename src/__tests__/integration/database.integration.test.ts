@@ -298,22 +298,6 @@ describe('Database Integration Tests', () => {
   });
 
   describe('Error scenarios', () => {
-    it('should handle database file in read-only directory gracefully', async () => {
-      // This test verifies error handling for initialization failures
-      const invalidDb = new Database('/invalid/path/test.db');
-
-      // Should handle the error during initialization
-      try {
-        await invalidDb.initialize();
-        // If it doesn't throw, that's actually okay in some environments
-        // So we just verify the behavior is consistent
-        expect(true).toBe(true);
-      } catch (error) {
-        // Error is expected in most cases
-        expect(error).toBeDefined();
-      }
-    });
-
     it('should handle operations on closed database', async () => {
       // Create a new database instance to test close
       const tempDb = new Database(':memory:');
