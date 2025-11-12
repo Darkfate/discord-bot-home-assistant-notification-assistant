@@ -97,29 +97,46 @@ export class Database {
   async getNotificationHistory(limit: number = 50): Promise<any[]> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const all = promisify(this.db.all.bind(this.db));
-    return all(
-      `SELECT * FROM notifications ORDER BY timestamp DESC LIMIT ?`,
-      [limit]
-    );
+    return new Promise((resolve, reject) => {
+      this.db!.all(
+        `SELECT * FROM notifications ORDER BY timestamp DESC LIMIT ?`,
+        [limit],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
   }
 
   async setState(key: string, value: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const run = promisify(this.db.run.bind(this.db));
-    await run(
-      `INSERT OR REPLACE INTO bot_state (key, value) VALUES (?, ?)`,
-      [key, value]
-    );
+    return new Promise((resolve, reject) => {
+      this.db!.run(
+        `INSERT OR REPLACE INTO bot_state (key, value) VALUES (?, ?)`,
+        [key, value],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
   }
 
   async getState(key: string): Promise<string | null> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const get = promisify(this.db.get.bind(this.db));
-    const result = await get(`SELECT value FROM bot_state WHERE key = ?`, [key]);
-    return result ? result.value : null;
+    return new Promise((resolve, reject) => {
+      this.db!.get(
+        `SELECT value FROM bot_state WHERE key = ?`,
+        [key],
+        (err, row: any) => {
+          if (err) reject(err);
+          else resolve(row ? row.value : null);
+        }
+      );
+    });
   }
 
   async close(): Promise<void> {

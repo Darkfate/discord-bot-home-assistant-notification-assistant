@@ -4,13 +4,14 @@ import {
   Interaction,
   SlashCommandBuilder,
   CommandInteraction,
+  ChatInputCommandInteraction,
 } from 'discord.js';
 import { Database } from './database.js';
 import { NotificationQueue } from './queue.js';
 
 interface Command {
-  data: SlashCommandBuilder;
-  execute: (interaction: CommandInteraction) => Promise<void>;
+  data: any;
+  execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
 }
 
 export class CommandHandler {
@@ -38,7 +39,7 @@ export class CommandHandler {
       data: new SlashCommandBuilder()
         .setName('ping')
         .setDescription('Responds with pong!'),
-      execute: async (interaction: CommandInteraction) => {
+      execute: async (interaction: ChatInputCommandInteraction) => {
         await interaction.reply('Pong! 🏓');
       },
     });
@@ -48,7 +49,7 @@ export class CommandHandler {
       data: new SlashCommandBuilder()
         .setName('status')
         .setDescription('Get bot status'),
-      execute: async (interaction: CommandInteraction) => {
+      execute: async (interaction: ChatInputCommandInteraction) => {
         const uptime = process.uptime();
         const hours = Math.floor(uptime / 3600);
         const minutes = Math.floor((uptime % 3600) / 60);
@@ -71,7 +72,7 @@ export class CommandHandler {
             .setMinValue(1)
             .setMaxValue(20)
         ),
-      execute: async (interaction: CommandInteraction) => {
+      execute: async (interaction: ChatInputCommandInteraction) => {
         const limit = interaction.options.getInteger('limit') || 10;
         const history = await this.database.getNotificationHistory(limit);
 
@@ -99,7 +100,7 @@ export class CommandHandler {
       data: new SlashCommandBuilder()
         .setName('test')
         .setDescription('Send a test notification'),
-      execute: async (interaction: CommandInteraction) => {
+      execute: async (interaction: ChatInputCommandInteraction) => {
         await interaction.deferReply();
         await this.queue.enqueue({
           source: 'Test',
@@ -119,7 +120,7 @@ export class CommandHandler {
     if (!command) return;
 
     try {
-      await command.execute(interaction as CommandInteraction);
+      await command.execute(interaction as ChatInputCommandInteraction);
     } catch (error) {
       console.error(`Error executing command ${interaction.commandName}:`, error);
       const reply = {
