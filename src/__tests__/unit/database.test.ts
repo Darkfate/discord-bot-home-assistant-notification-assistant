@@ -36,32 +36,44 @@ describe('Database', () => {
     it('should create required tables', async () => {
       // Try to insert data to verify tables exist
       await expect(
-        database.saveNotification('test', 'message')
+        database.saveNotificationToQueue({
+          source: 'test',
+          message: 'message',
+          severity: 'info',
+        })
       ).resolves.toBeDefined();
     });
   });
 
-  describe('saveNotification', () => {
+  describe('saveNotificationToQueue', () => {
     it('should save notification with all fields', async () => {
-      const id = await database.saveNotification(
-        'Home Assistant',
-        'Test message',
-        'Test title',
-        '123456789'
-      );
+      const id = await database.saveNotificationToQueue({
+        source: 'Home Assistant',
+        message: 'Test message',
+        title: 'Test title',
+        severity: 'info',
+      });
 
       expect(id).toBeGreaterThan(0);
     });
 
     it('should save notification without optional fields', async () => {
-      const id = await database.saveNotification('Test', 'Message only');
+      const id = await database.saveNotificationToQueue({
+        source: 'Test',
+        message: 'Message only',
+        severity: 'info',
+      });
       expect(id).toBeGreaterThan(0);
     });
 
     it('should throw error if database not initialized', async () => {
       const uninitializedDb = new Database(':memory:');
       await expect(
-        uninitializedDb.saveNotification('test', 'message')
+        uninitializedDb.saveNotificationToQueue({
+          source: 'test',
+          message: 'message',
+          severity: 'info',
+        })
       ).rejects.toThrow('Database not initialized');
     });
   });
@@ -73,10 +85,20 @@ describe('Database', () => {
     });
 
     it('should return saved notifications', async () => {
-      await database.saveNotification('Source1', 'Message1', 'Title1');
+      await database.saveNotificationToQueue({
+        source: 'Source1',
+        message: 'Message1',
+        title: 'Title1',
+        severity: 'info',
+      });
       // Add a small delay to ensure different timestamps
       await new Promise((resolve) => setTimeout(resolve, 100));
-      await database.saveNotification('Source2', 'Message2', 'Title2');
+      await database.saveNotificationToQueue({
+        source: 'Source2',
+        message: 'Message2',
+        title: 'Title2',
+        severity: 'info',
+      });
 
       const history = await database.getNotificationHistory();
       expect(history).toHaveLength(2);
@@ -89,7 +111,11 @@ describe('Database', () => {
 
     it('should respect limit parameter', async () => {
       for (let i = 0; i < 5; i++) {
-        await database.saveNotification(`Source${i}`, `Message${i}`);
+        await database.saveNotificationToQueue({
+          source: `Source${i}`,
+          message: `Message${i}`,
+          severity: 'info',
+        });
       }
 
       const history = await database.getNotificationHistory(3);
@@ -143,7 +169,11 @@ describe('Database', () => {
 
       // Attempting operations after close should fail
       await expect(
-        tempDb.saveNotification('test', 'message')
+        tempDb.saveNotificationToQueue({
+          source: 'test',
+          message: 'message',
+          severity: 'info',
+        })
       ).rejects.toThrow();
     });
 
