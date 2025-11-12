@@ -14,29 +14,30 @@ A comprehensive web-based testing interface for the Discord Bot webhook API. Thi
 
 ### With Docker Compose (Recommended)
 
-Deploy the sandbox alongside the bot service:
+The sandbox is built into the main bot service - just deploy normally:
 
 ```bash
-# Deploy bot with sandbox
-docker-compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+# Deploy bot with integrated sandbox
+docker-compose up -d
 
 # Or rebuild after changes
-docker-compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d --build
+docker-compose up -d --build
 ```
 
-Access the sandbox at: **http://localhost:3000/sandbox**
+Access:
+- **Sandbox UI**: http://localhost:5000/sandbox
+- **Webhook API**: http://localhost:5000/webhook/*
 
 ### Without Docker (Development)
 
 #### 1. Install Dependencies
 
 ```bash
-# Install frontend dependencies
-cd sandbox/frontend
+# Install bot dependencies (from project root)
 npm install
 
-# Install server dependencies
-cd ../server
+# Install frontend dependencies
+cd sandbox/frontend
 npm install
 ```
 
@@ -46,58 +47,67 @@ npm install
 # Terminal 1: Start bot service (from project root)
 npm run dev
 
-# Terminal 2: Start sandbox server
-cd sandbox/server
-npm run dev
-
-# Terminal 3: Start frontend dev server
+# Terminal 2: Start frontend dev server
 cd sandbox/frontend
 npm run dev
 ```
 
 Access the development sandbox at: **http://localhost:5173/sandbox**
 
+(Vite dev server proxies API requests to bot service on port 5000)
+
 ## Architecture
 
+**Integrated Single-Service Architecture:**
+
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Browser                                                     │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Sandbox Service (Port 3000)                                 │
-│  ├── GET /sandbox/* → Serve React SPA                       │
-│  └── /sandbox/api/* → Proxy to Bot Service                  │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Bot Service (Port 5000)                                     │
-│  └── Webhook API                                            │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  Browser                                         │
+└───────────────────┬──────────────────────────────┘
+                    │
+                    ▼
+┌──────────────────────────────────────────────────┐
+│  Bot Service (Port 5000)                         │
+│  ├── GET /sandbox/* → Serve React SPA            │
+│  ├── GET /health                                 │
+│  ├── POST /webhook/notify                        │
+│  ├── GET /webhook/notify/:id                     │
+│  ├── DELETE /webhook/notify/:id                  │
+│  ├── POST /webhook/notify/:id/retry              │
+│  ├── GET /webhook/stats                          │
+│  └── GET /webhook/notifications                  │
+└──────────────────────────────────────────────────┘
 ```
+
+**Benefits:**
+- Single Docker service
+- Single port (5000)
+- No proxy needed (same-origin requests)
+- Simpler deployment
+- Automatic inclusion in production builds
 
 ## Configuration
 
 ### Environment Variables
 
-**Sandbox Service:**
-- `SANDBOX_PORT`: Port for sandbox service (default: `3000`)
-- `BOT_API_URL`: Internal bot API URL (default: `http://discord-bot:5000`)
+**Bot Service** (includes sandbox):
+- `DISCORD_TOKEN`: Discord bot token (required)
+- `DISCORD_CHANNEL_ID`: Target Discord channel ID (required)
+- `WEBHOOK_PORT`: Port for both API and UI (default: `5000`)
+- `WEBHOOK_SECRET`: HMAC signature secret (optional)
+- `DATABASE_PATH`: SQLite database path (default: `./data/bot.db`)
+- `LOG_LEVEL`: Logging level (default: `info`)
 
-**Bot Service:**
-See main project README for bot configuration.
+See main project README for full configuration details.
 
 ### Docker Compose
 
-The sandbox is configured as an optional service in `docker-compose.sandbox.yml`:
+Simple single-service deployment:
 
 ```yaml
 services:
-  sandbox:
-    build:
-      context: ./sandbox
+  discord-bot:
+    build: .
     environment:
       - SANDBOX_PORT=3000
       - BOT_API_URL=http://discord-bot:5000

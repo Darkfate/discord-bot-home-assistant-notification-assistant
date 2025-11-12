@@ -10,12 +10,15 @@ services:
       - DATABASE_PATH=/app/data/bot.db
       - LOG_LEVEL=info
     ports:
-      - "5000:5000"
+      - "5000:5000"  # Serves both webhook API and sandbox UI
     volumes:
       - ./data:/app/data
     restart: unless-stopped
     networks:
       - home-server
+    # Access:
+    #   - Webhook API: http://localhost:5000/webhook/*
+    #   - Sandbox UI: http://localhost:5000/sandbox
 
 networks:
   home-server:

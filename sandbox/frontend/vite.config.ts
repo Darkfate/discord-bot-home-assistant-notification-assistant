@@ -14,10 +14,14 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/sandbox/api': {
+      // Proxy API endpoints to bot service during development
+      '/webhook': {
         target: 'http://localhost:5000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/sandbox\/api/, ''),
+      },
+      '/health': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
       },
     },
   },

@@ -1,22 +1,63 @@
-FROM node:20-alpine
+# Stage 1: Build bot service
+FROM node:20-alpine AS bot-builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy bot package files
 COPY package*.json ./
 COPY tsconfig.json ./
 
 # Install dependencies
 RUN npm ci
 
-# Copy source code
+# Copy bot source code
 COPY src ./src
 
 # Build TypeScript
 RUN npm run build
 
+# Stage 2: Build sandbox frontend
+FROM node:20-alpine AS sandbox-builder
+
+WORKDIR /app
+
+# Copy sandbox frontend package files
+COPY sandbox/frontend/package*.json ./
+
+# Install dependencies
+RUN npm ci --legacy-peer-deps
+
+# Copy sandbox frontend source
+COPY sandbox/frontend ./
+
+# Build frontend
+RUN npm run build
+
+# Stage 3: Production image
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy bot dependencies and build
+COPY --from=bot-builder /app/package*.json ./
+COPY --from=bot-builder /app/node_modules ./node_modules
+COPY --from=bot-builder /app/dist ./dist
+
+# Copy sandbox frontend build
+COPY --from=sandbox-builder /app/dist ./sandbox-dist
+
 # Create data directory
 RUN mkdir -p data
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Change ownership
+RUN chown -R nodejs:nodejs /app
+
+# Switch to non-root user
+USER nodejs
 
 # Expose webhook port
 EXPOSE 5000

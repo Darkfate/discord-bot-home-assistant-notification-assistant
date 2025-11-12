@@ -14,7 +14,7 @@ import type {
 class APIClient {
   private client: AxiosInstance;
 
-  constructor(baseURL: string = '/sandbox/api') {
+  constructor(baseURL: string = '') {
     this.client = axios.create({
       baseURL,
       headers: {

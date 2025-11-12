@@ -3,6 +3,12 @@ import { PersistentNotificationQueue } from './queue/persistentQueue.js';
 import { Database } from './database.js';
 import { parseScheduledTime, formatRelativeTime } from './utils/dateParser.js';
 import crypto from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export class WebhookServer {
   private app: express.Application;
@@ -286,6 +292,28 @@ export class WebhookServer {
         res.status(500).json({ error: 'Internal server error' });
       }
     });
+
+    // Serve sandbox frontend static files
+    const sandboxPath = path.join(__dirname, '../sandbox-dist');
+    if (fs.existsSync(sandboxPath)) {
+      console.log('Serving sandbox frontend from:', sandboxPath);
+
+      // Serve static files
+      this.app.use('/sandbox', express.static(sandboxPath));
+
+      // SPA fallback for client-side routing
+      this.app.get('/sandbox/*', (req: Request, res: Response) => {
+        res.sendFile(path.join(sandboxPath, 'index.html'), (err) => {
+          if (err) {
+            console.error('Error serving sandbox index.html:', err);
+            res.status(500).json({ error: 'Failed to load sandbox frontend' });
+          }
+        });
+      });
+    } else {
+      console.log('Sandbox frontend not found at:', sandboxPath);
+      console.log('Sandbox UI will not be available. Run in development mode or build the sandbox frontend.');
+    }
 
     // 404 handler
     this.app.use((req: Request, res: Response) => {
