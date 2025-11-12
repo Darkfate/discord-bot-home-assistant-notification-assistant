@@ -2,15 +2,13 @@ name: Run Tests
 
 on:
   pull_request:
-    branches:
-      - main
-      - master
-      - develop
+    # Runs on all PRs regardless of target branch
   push:
     branches:
       - main
       - master
       - develop
+    # Only runs on direct pushes to protected branches
 
 jobs:
   test:
