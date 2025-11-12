@@ -1,7 +1,8 @@
 import dotenv from 'dotenv';
 import { Client, GatewayIntentBits, Events } from 'discord.js';
 import { Database } from './database.js';
-import { NotificationQueue } from './queue.js';
+import { PersistentNotificationQueue } from './queue/persistentQueue.js';
+import { NotificationScheduler } from './queue/scheduler.js';
 import { WebhookServer } from './webhook.js';
 import { CommandHandler } from './commands.js';
 
@@ -12,6 +13,7 @@ const CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
 const WEBHOOK_PORT = parseInt(process.env.WEBHOOK_PORT || '5000');
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 const DATABASE_PATH = process.env.DATABASE_PATH || './data/bot.db';
+const SCHEDULER_INTERVAL = parseInt(process.env.QUEUE_SCHEDULER_INTERVAL || '30');
 
 if (!TOKEN || !CHANNEL_ID) {
   console.error('Missing required environment variables: DISCORD_TOKEN and DISCORD_CHANNEL_ID');
@@ -32,7 +34,10 @@ const client = new Client({
 const database = new Database(DATABASE_PATH);
 
 // Initialize notification queue
-let queue: NotificationQueue;
+let queue: PersistentNotificationQueue;
+
+// Initialize scheduler
+let scheduler: NotificationScheduler;
 
 // Initialize command handler
 let commandHandler: CommandHandler;
@@ -45,7 +50,7 @@ client.on(Events.ClientReady, async () => {
   await commandHandler.registerGlobalCommands();
 
   // Start webhook server
-  const webhook = new WebhookServer(queue, WEBHOOK_SECRET);
+  const webhook = new WebhookServer(queue, database, WEBHOOK_SECRET);
   webhook.start(WEBHOOK_PORT);
 
   console.log(`🚀 Bot is ready! Webhook listening on port ${WEBHOOK_PORT}`);
@@ -68,9 +73,44 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('Shutting down gracefully...');
+  console.log('\nShutting down gracefully...');
+
+  // Stop the scheduler first
+  if (scheduler) {
+    scheduler.stop();
+  }
+
+  // Wait for queue to finish processing
+  if (queue) {
+    await queue.shutdown();
+  }
+
+  // Close Discord connection
+  await client.destroy();
+
+  // Close database connection
+  await database.close();
+
+  console.log('Shutdown complete');
+  process.exit(0);
+});
+
+// Handle SIGTERM as well (for Docker)
+process.on('SIGTERM', async () => {
+  console.log('\nReceived SIGTERM, shutting down gracefully...');
+
+  if (scheduler) {
+    scheduler.stop();
+  }
+
+  if (queue) {
+    await queue.shutdown();
+  }
+
   await client.destroy();
   await database.close();
+
+  console.log('Shutdown complete');
   process.exit(0);
 });
 
@@ -80,8 +120,13 @@ async function main() {
     console.log('Initializing database...');
     await database.initialize();
 
-    // Initialize queue
-    queue = new NotificationQueue(client, database, CHANNEL_ID!);
+    // Initialize persistent queue
+    queue = new PersistentNotificationQueue(client, database, CHANNEL_ID!);
+    await queue.initialize();
+
+    // Initialize scheduler
+    scheduler = new NotificationScheduler(queue, database);
+    scheduler.start(SCHEDULER_INTERVAL);
 
     // Initialize command handler
     commandHandler = new CommandHandler(client, database, queue);
