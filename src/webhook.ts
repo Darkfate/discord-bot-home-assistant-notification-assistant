@@ -212,6 +212,81 @@ export class WebhookServer {
       }
     });
 
+    // Get queue statistics with health indicator
+    this.app.get('/webhook/stats', async (req: Request, res: Response) => {
+      try {
+        const stats = await this.database.getQueueStats();
+
+        // Calculate health based on failed count
+        let health: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
+        if (stats.failed > 0 && stats.failed <= 5) {
+          health = 'degraded';
+        } else if (stats.failed > 5) {
+          health = 'unhealthy';
+        }
+
+        res.status(200).json({
+          ...stats,
+          health,
+        });
+      } catch (error) {
+        console.error('Error fetching queue stats:', error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    // Query notifications with filters and pagination
+    this.app.get('/webhook/notifications', async (req: Request, res: Response) => {
+      try {
+        const {
+          status,
+          source,
+          search,
+          limit = '25',
+          offset = '0',
+          sort = 'created_at',
+          order = 'DESC',
+        } = req.query;
+
+        const result = await this.database.queryNotifications({
+          status: status as string,
+          source: source as string,
+          search: search as string,
+          limit: parseInt(limit as string, 10),
+          offset: parseInt(offset as string, 10),
+          sort: sort as string,
+          order: (order as string).toUpperCase() === 'ASC' ? 'ASC' : 'DESC',
+        });
+
+        // Convert notifications to API format
+        const notifications = result.notifications.map((notification) => ({
+          id: notification.id,
+          source: notification.source,
+          title: notification.title,
+          message: notification.message,
+          severity: notification.severity,
+          status: notification.status,
+          created_at: notification.createdAt.toISOString(),
+          scheduled_for: notification.scheduledFor.toISOString(),
+          sent_at: notification.sentAt?.toISOString(),
+          retry_count: notification.retryCount,
+          max_retries: notification.maxRetries,
+          last_error: notification.lastError,
+          discord_message_id: notification.discordMessageId,
+        }));
+
+        res.status(200).json({
+          notifications,
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+        });
+      } catch (error) {
+        console.error('Error querying notifications:', error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
     // 404 handler
     this.app.use((req: Request, res: Response) => {
       res.status(404).json({ error: 'Not found' });

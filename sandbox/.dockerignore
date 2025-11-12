@@ -1,0 +1,36 @@
+# Node modules
+**/node_modules
+**/npm-debug.log
+
+# Build outputs
+**/dist
+**/build
+
+# Development files
+**/.git
+**/.gitignore
+**/.env
+**/.env.local
+**/.vscode
+**/.idea
+
+# Testing
+**/coverage
+**/.nyc_output
+**/test
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Documentation
+**/*.md
+!**/README.md
+
+# OS files
+**/.DS_Store
+**/Thumbs.db
+
+# Logs
+**/logs
+**/*.log

@@ -1,0 +1,21 @@
+services:
+  sandbox:
+    build:
+      context: ./sandbox
+      dockerfile: Dockerfile
+    container_name: discord-bot-sandbox
+    environment:
+      - SANDBOX_PORT=3000
+      - BOT_API_URL=http://discord-bot:5000
+    ports:
+      - "${SANDBOX_PORT:-3000}:3000"
+    depends_on:
+      discord-bot:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - home-server
+
+networks:
+  home-server:
+    driver: bridge
