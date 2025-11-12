@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  discord-bot:
+    build: .
+    container_name: discord-home-bot
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DISCORD_CHANNEL_ID=${DISCORD_CHANNEL_ID}
+      - WEBHOOK_PORT=5000
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - DATABASE_PATH=/app/data/bot.db
+      - LOG_LEVEL=info
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    networks:
+      - home-server
+
+networks:
+  home-server:
+    driver: bridge
