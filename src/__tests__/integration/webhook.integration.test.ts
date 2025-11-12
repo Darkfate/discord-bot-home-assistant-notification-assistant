@@ -25,13 +25,13 @@ describe('Webhook Integration Tests', () => {
     // Set up mock Discord client
     mockClient = {
       channels: {
-        fetch: jest.fn<any, any>(),
+        fetch: jest.fn(),
       },
     } as any;
 
     mockChannel = {
-      isTextBased: jest.fn<any, any>().mockReturnValue(true),
-      send: jest.fn<any, any>().mockResolvedValue({ id: 'message-id-123' }),
+      isTextBased: jest.fn().mockReturnValue(true),
+      send: jest.fn().mockResolvedValue({ id: 'message-id-123' }),
     } as any;
 
     (mockClient.channels.fetch as any).mockResolvedValue(mockChannel as any);

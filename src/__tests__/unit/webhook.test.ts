@@ -13,8 +13,8 @@ describe('WebhookServer', () => {
   beforeEach(() => {
     // @ts-ignore - Mock setup for testing
     mockQueue = {
-      enqueue: jest.fn().mockResolvedValue(undefined),
-      getQueueSize: jest.fn().mockReturnValue(0),
+      enqueue: jest.fn<any>().mockResolvedValue(undefined),
+      getQueueSize: jest.fn<any>().mockReturnValue(0),
     } as any;
 
     webhookServer = new WebhookServer(mockQueue, '');

@@ -16,31 +16,31 @@ describe('CommandHandler', () => {
     mockClient = {
       application: {
         commands: {
-          set: jest.fn().mockResolvedValue([]),
+          set: jest.fn<any>().mockResolvedValue([]),
         },
       },
     } as any;
 
     // @ts-ignore - Mock setup for testing
     mockDatabase = {
-      getNotificationHistory: jest.fn(),
+      getNotificationHistory: jest.fn<any>(),
     } as any;
 
     // @ts-ignore - Mock setup for testing
     mockQueue = {
-      getQueueSize: jest.fn().mockReturnValue(0),
-      enqueue: jest.fn().mockResolvedValue(undefined),
+      getQueueSize: jest.fn<any>().mockReturnValue(0),
+      enqueue: jest.fn<any>().mockResolvedValue(undefined),
     } as any;
 
     // @ts-ignore - Mock setup for testing
     mockInteraction = {
-      isCommand: jest.fn().mockReturnValue(true),
+      isCommand: jest.fn<any>().mockReturnValue(true),
       commandName: '',
-      reply: jest.fn().mockResolvedValue({} as InteractionResponse),
-      editReply: jest.fn().mockResolvedValue({} as InteractionResponse),
-      deferReply: jest.fn().mockResolvedValue({} as InteractionResponse),
+      reply: jest.fn<any>().mockResolvedValue({} as InteractionResponse),
+      editReply: jest.fn<any>().mockResolvedValue({} as InteractionResponse),
+      deferReply: jest.fn<any>().mockResolvedValue({} as InteractionResponse),
       options: {
-        getInteger: jest.fn(),
+        getInteger: jest.fn<any>(),
       },
       replied: false,
       deferred: false,

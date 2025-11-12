@@ -15,19 +15,19 @@ describe('NotificationQueue', () => {
     // @ts-ignore - Mock setup for testing
     mockClient = {
       channels: {
-        fetch: jest.fn(),
+        fetch: jest.fn<any>(),
       },
     } as any;
 
     // @ts-ignore - Mock setup for testing
     mockDatabase = {
-      saveNotification: jest.fn().mockResolvedValue(1),
+      saveNotification: jest.fn<any>().mockResolvedValue(1),
     } as any;
 
     // @ts-ignore - Mock setup for testing
     mockChannel = {
-      isTextBased: jest.fn().mockReturnValue(true),
-      send: jest.fn().mockResolvedValue({ id: 'message-id-123' }),
+      isTextBased: jest.fn<any>().mockReturnValue(true),
+      send: jest.fn<any>().mockResolvedValue({ id: 'message-id-123' }),
     } as any;
 
     (mockClient.channels.fetch as any).mockResolvedValue(mockChannel as any);
