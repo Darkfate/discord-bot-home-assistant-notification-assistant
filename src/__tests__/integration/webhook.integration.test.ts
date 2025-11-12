@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { WebhookServer } from '../../webhook.js';
-import { NotificationQueue } from '../../queue.js';
+import { PersistentNotificationQueue } from '../../queue/persistentQueue.js';
 import { Database } from '../../database.js';
 import { Client, TextChannel } from 'discord.js';
 import request from 'supertest';
@@ -13,7 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe('Webhook Integration Tests', () => {
   let webhookServer: WebhookServer;
-  let queue: NotificationQueue;
+  let queue: PersistentNotificationQueue;
   let database: Database;
   let mockClient: jest.Mocked<Client>;
   let mockChannel: jest.Mocked<TextChannel>;
@@ -41,14 +41,16 @@ describe('Webhook Integration Tests', () => {
     await database.initialize();
 
     // Set up real queue with mocked Discord client
-    queue = new NotificationQueue(mockClient, database, testChannelId);
+    queue = new PersistentNotificationQueue(mockClient, database, testChannelId);
+    await queue.initialize();
 
     // Set up webhook server
-    webhookServer = new WebhookServer(queue, '');
+    webhookServer = new WebhookServer(queue, database, '');
     app = (webhookServer as any).app;
   });
 
   afterAll(async () => {
+    await queue.shutdown();
     await database.close();
     try {
       await fs.unlink(testDbPath);
@@ -88,12 +90,12 @@ describe('Webhook Integration Tests', () => {
       expect(sentMessage.embeds[0].data.description).toBe('Front door opened');
 
       // Verify notification was saved to database
-      const history = await database.getNotificationHistory(1);
-      expect(history).toHaveLength(1);
-      expect(history[0].source).toBe('Home Assistant');
-      expect(history[0].title).toBe('Door Alert');
-      expect(history[0].message).toBe('Front door opened');
-      expect(history[0].discord_message_id).toBe('message-id-123');
+      const history = await database.getNotificationHistory(10);
+      const saved = history.find(h => h.source === 'Home Assistant');
+      expect(saved).toBeDefined();
+      expect(saved?.title).toBe('Door Alert');
+      expect(saved?.message).toBe('Front door opened');
+      expect(saved?.discordMessageId).toBe('message-id-123');
     });
 
     it('should handle multiple notifications in sequence', async () => {
@@ -115,7 +117,7 @@ describe('Webhook Integration Tests', () => {
       expect(mockChannel.send).toHaveBeenCalledTimes(3);
 
       // Verify all notifications were saved
-      const history = await database.getNotificationHistory(10);
+      const history = await database.getNotificationHistory(20);
       expect(history.length).toBeGreaterThanOrEqual(3);
     });
   });
@@ -126,7 +128,7 @@ describe('Webhook Integration Tests', () => {
     const secret = 'integration-test-secret';
 
     beforeAll(() => {
-      webhookServerWithSecret = new WebhookServer(queue, secret);
+      webhookServerWithSecret = new WebhookServer(queue, database, secret);
       appWithSecret = (webhookServerWithSecret as any).app;
     });
 
@@ -201,12 +203,12 @@ describe('Webhook Integration Tests', () => {
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       // Verify notification was still saved to database
-      const history = await database.getNotificationHistory(10);
+      const history = await database.getNotificationHistory(20);
       const saved = history.find((n) => n.source === 'Error Test');
       expect(saved).toBeDefined();
       expect(saved?.message).toBe('This should still be saved');
       // Discord message ID should be null since send failed
-      expect(saved?.discord_message_id).toBeNull();
+      expect(saved?.discordMessageId).toBeNull();
     });
   });
 });

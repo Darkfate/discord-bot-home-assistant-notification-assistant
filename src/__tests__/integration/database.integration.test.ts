@@ -26,9 +26,18 @@ describe('Database Integration Tests', () => {
   describe('Complete notification lifecycle', () => {
     it('should persist notifications across database instances', async () => {
       // Save notifications with delay to ensure different timestamps
-      await database.saveNotification('Source1', 'Message1', 'Title1');
+      await database.saveNotificationToQueue({
+        source: 'Source1',
+        message: 'Message1',
+        title: 'Title1',
+        severity: 'info',
+      });
       await new Promise((resolve) => setTimeout(resolve, 10));
-      await database.saveNotification('Source2', 'Message2');
+      await database.saveNotificationToQueue({
+        source: 'Source2',
+        message: 'Message2',
+        severity: 'info',
+      });
 
       // Close and reopen database
       await database.close();
@@ -47,7 +56,12 @@ describe('Database Integration Tests', () => {
     it('should handle large number of notifications', async () => {
       // Save 100 notifications sequentially to ensure proper ordering
       for (let i = 0; i < 100; i++) {
-        await database.saveNotification(`Source${i}`, `Message${i}`, `Title${i}`);
+        await database.saveNotificationToQueue({
+          source: `Source${i}`,
+          message: `Message${i}`,
+          title: `Title${i}`,
+          severity: 'info',
+        });
       }
 
       // Retrieve with different limits
@@ -64,24 +78,27 @@ describe('Database Integration Tests', () => {
     });
 
     it('should maintain notification metadata', async () => {
-      const discordMessageId = 'discord-msg-123456';
-      const id = await database.saveNotification(
-        'Home Assistant',
-        'Front door opened',
-        'Security Alert',
-        discordMessageId
-      );
+      const id = await database.saveNotificationToQueue({
+        source: 'Home Assistant',
+        message: 'Front door opened',
+        title: 'Security Alert',
+        severity: 'warning',
+      });
 
-      const history = await database.getNotificationHistory(1);
-      expect(history[0]).toMatchObject({
+      // Update the notification with discord message ID after "sending"
+      await database.updateNotificationStatus(id, 'sent');
+      await database.updateNotificationDiscordId(id, 'discord-msg-123456');
+
+      const notification = await database.getNotificationById(id);
+      expect(notification).toMatchObject({
         id,
         source: 'Home Assistant',
         title: 'Security Alert',
         message: 'Front door opened',
-        discord_message_id: discordMessageId,
+        discordMessageId: 'discord-msg-123456',
         status: 'sent',
       });
-      expect(history[0].timestamp).toBeDefined();
+      expect(notification?.createdAt).toBeDefined();
     });
   });
 
@@ -138,7 +155,13 @@ describe('Database Integration Tests', () => {
     it('should handle concurrent notification saves', async () => {
       const promises = [];
       for (let i = 0; i < 50; i++) {
-        promises.push(database.saveNotification(`Source${i}`, `Message${i}`));
+        promises.push(
+          database.saveNotificationToQueue({
+            source: `Source${i}`,
+            message: `Message${i}`,
+            severity: 'info',
+          })
+        );
       }
 
       const results = await Promise.all(promises);
@@ -168,15 +191,27 @@ describe('Database Integration Tests', () => {
 
     it('should handle mixed read and write operations', async () => {
       // Prepare some initial data
-      await database.saveNotification('Initial', 'Initial message');
+      await database.saveNotificationToQueue({
+        source: 'Initial',
+        message: 'Initial message',
+        severity: 'info',
+      });
       await database.setState('counter', '0');
 
       // Mix of operations
       const promises = [
-        database.saveNotification('Source1', 'Message1'),
+        database.saveNotificationToQueue({
+          source: 'Source1',
+          message: 'Message1',
+          severity: 'info',
+        }),
         database.getNotificationHistory(10),
         database.setState('counter', '1'),
-        database.saveNotification('Source2', 'Message2'),
+        database.saveNotificationToQueue({
+          source: 'Source2',
+          message: 'Message2',
+          severity: 'info',
+        }),
         database.getState('counter'),
         database.getNotificationHistory(5),
         database.setState('counter', '2'),
@@ -202,7 +237,12 @@ describe('Database Integration Tests', () => {
       const specialMessage = 'Message with\nnewlines\tand\ttabs';
       const specialTitle = '🔔 Alert! 🚨';
 
-      await database.saveNotification(specialSource, specialMessage, specialTitle);
+      await database.saveNotificationToQueue({
+        source: specialSource,
+        message: specialMessage,
+        title: specialTitle,
+        severity: 'info',
+      });
 
       const history = await database.getNotificationHistory(1);
       expect(history[0].source).toBe(specialSource);
@@ -211,7 +251,11 @@ describe('Database Integration Tests', () => {
     });
 
     it('should handle empty strings', async () => {
-      const id = await database.saveNotification('', '');
+      const id = await database.saveNotificationToQueue({
+        source: '',
+        message: '',
+        severity: 'info',
+      });
       expect(id).toBeGreaterThan(0);
 
       const history = await database.getNotificationHistory(1);
@@ -221,7 +265,12 @@ describe('Database Integration Tests', () => {
 
     it('should handle very long strings', async () => {
       const longString = 'a'.repeat(10000);
-      await database.saveNotification(longString, longString, longString);
+      await database.saveNotificationToQueue({
+        source: longString,
+        message: longString,
+        title: longString,
+        severity: 'info',
+      });
 
       const history = await database.getNotificationHistory(1);
       expect(history[0].source).toBe(longString);
@@ -272,7 +321,11 @@ describe('Database Integration Tests', () => {
       await tempDb.close();
 
       await expect(
-        tempDb.saveNotification('test', 'message')
+        tempDb.saveNotificationToQueue({
+          source: 'test',
+          message: 'message',
+          severity: 'info',
+        })
       ).rejects.toThrow();
       await expect(tempDb.getNotificationHistory()).rejects.toThrow();
       await expect(tempDb.setState('key', 'value')).rejects.toThrow();
