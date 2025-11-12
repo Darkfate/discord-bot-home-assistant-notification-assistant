@@ -1,5 +1,19 @@
 # Claude Development Guidelines
 
+## Feature Development Workflow
+
+**Every feature added or modified by Claude MUST follow this workflow:**
+
+1. **Plan the feature** - Understand requirements and design
+2. **Update existing tests** - Modify tests affected by the changes
+3. **Write new tests** - Add comprehensive test coverage for new functionality
+4. **Implement the feature** - Write the actual code
+5. **Verify coverage** - Ensure code coverage thresholds are met
+6. **Document the feature** - Add clear usage instructions
+7. **Commit and push** - Include tests and documentation in the commit
+
+**No feature is complete without tests AND documentation.**
+
 ## Testing Requirements
 
 **All features added or modified by Claude MUST include appropriate testing.**
@@ -67,6 +81,13 @@ export default {
 - **Integration tests** for components that interact with external services
 - **Error handling tests** for all error scenarios
 - **Edge case tests** for boundary conditions
+
+**When modifying existing features:**
+
+- **Update affected tests** - Modify existing tests that are impacted by your changes
+- **Add new test cases** - Add tests for new functionality within existing features
+- **Verify all tests pass** - Ensure modifications don't break existing tests
+- **Increase coverage** - Add tests for previously uncovered code paths if applicable
 
 #### 2. Test Organization
 
@@ -173,13 +194,29 @@ describe('NotificationQueue', () => {
 
 Before committing any changes, Claude MUST:
 
-1. ✅ Write tests for all new features
-2. ✅ Write tests for all bug fixes
-3. ✅ Update existing tests if modifying functionality
-4. ✅ Run `npm test` and ensure all tests pass
-5. ✅ Run `npm run test:coverage` and meet coverage thresholds
-6. ✅ Run `npm run build` to ensure TypeScript compiles
-7. ✅ Run `npm run lint` to ensure code style compliance
+#### Testing Requirements
+1. ✅ **Update existing tests** affected by changes
+2. ✅ **Write new tests** for all new features
+3. ✅ **Write tests** for all bug fixes
+4. ✅ **Add edge case tests** for boundary conditions
+5. ✅ **Run `npm test`** and ensure all tests pass
+6. ✅ **Run `npm run test:coverage`** and meet coverage thresholds (minimum 70%)
+7. ✅ **Verify critical paths** have 100% coverage
+
+#### Code Quality
+8. ✅ **Run `npm run build`** to ensure TypeScript compiles
+9. ✅ **Run `npm run lint`** to ensure code style compliance
+10. ✅ **Review code** for security vulnerabilities
+
+#### Documentation Requirements
+11. ✅ **Update README.md** with feature usage and examples
+12. ✅ **Add JSDoc/TSDoc comments** to all public APIs
+13. ✅ **Include usage examples** in documentation
+14. ✅ **Document error handling** and common issues
+15. ✅ **Update CHANGELOG.md** with changes
+16. ✅ **Document breaking changes** if applicable
+
+**All three categories (Testing, Code Quality, Documentation) must be completed before commit.**
 
 ### Test-Driven Development (TDD)
 
@@ -244,7 +281,7 @@ All tests must pass in CI/CD pipeline before merging. Configure GitHub Actions t
 - run: npm run test:coverage
 ```
 
-### Documentation
+### Testing Documentation
 
 Document testing approach in:
 
@@ -255,6 +292,206 @@ Document testing approach in:
 
 ---
 
+## Documentation Requirements
+
+**Every feature MUST be documented with clear, user-friendly instructions.**
+
+### What to Document
+
+When adding or modifying features, create or update documentation that includes:
+
+#### 1. Feature Overview
+
+- **Purpose** - What the feature does and why it exists
+- **Use cases** - When and why users would use this feature
+- **Prerequisites** - Any setup or requirements needed
+
+#### 2. Usage Instructions
+
+**Must include step-by-step instructions with examples:**
+
+```markdown
+## Feature Name
+
+### Description
+Brief explanation of what this feature does.
+
+### Prerequisites
+- Requirement 1
+- Requirement 2
+
+### Usage
+
+#### Basic Usage
+\`\`\`typescript
+// Example code showing basic usage
+const result = myFeature.doSomething();
+\`\`\`
+
+#### Advanced Usage
+\`\`\`typescript
+// Example showing advanced scenarios
+const advanced = myFeature.doSomethingAdvanced({
+  option1: 'value',
+  option2: true
+});
+\`\`\`
+
+#### Configuration
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| option1 | string | 'default' | What this does |
+| option2 | boolean | false | What this controls |
+
+### Error Handling
+Common errors and how to resolve them:
+- **Error X**: Cause and solution
+- **Error Y**: Cause and solution
+
+### Examples
+Real-world examples of using the feature.
+```
+
+#### 3. API Documentation
+
+For functions, classes, and methods:
+
+```typescript
+/**
+ * Brief description of what this function does
+ *
+ * @param param1 - Description of parameter 1
+ * @param param2 - Description of parameter 2
+ * @returns Description of return value
+ * @throws {ErrorType} Description of when this error is thrown
+ *
+ * @example
+ * ```typescript
+ * const result = myFunction('value1', true);
+ * console.log(result); // Expected output
+ * ```
+ */
+export function myFunction(param1: string, param2: boolean): ResultType {
+  // implementation
+}
+```
+
+#### 4. Update Existing Documentation
+
+When modifying features:
+
+- **Update README.md** - Modify examples and usage instructions
+- **Update inline comments** - Keep JSDoc comments current
+- **Update CHANGELOG.md** - Document what changed and why
+- **Update migration guides** - If breaking changes are introduced
+
+### Where to Document
+
+#### Primary Locations
+
+1. **README.md** - Main project documentation
+   - Getting started guide
+   - Feature overview
+   - Basic usage examples
+   - Links to detailed documentation
+
+2. **Inline code comments** - Technical documentation
+   - JSDoc/TSDoc comments for all public APIs
+   - Explain complex logic
+   - Document non-obvious decisions
+
+3. **Separate docs/ folder** - Detailed guides (if applicable)
+   - `docs/features/` - Individual feature documentation
+   - `docs/api/` - API reference
+   - `docs/guides/` - How-to guides and tutorials
+
+4. **CHANGELOG.md** - Track changes over time
+   - Document all features, fixes, and changes
+   - Include version numbers and dates
+   - Link to relevant issues/PRs
+
+#### Discord Bot Specific Documentation
+
+For Discord bot features, document:
+
+- **Command syntax** - Exact command format
+- **Parameters** - Required and optional parameters
+- **Permissions** - Required bot and user permissions
+- **Examples** - Sample commands and expected responses
+- **Rate limits** - Any usage restrictions
+
+Example:
+
+```markdown
+### /notify Command
+
+**Description**: Sends a notification to configured Discord channel from Home Assistant.
+
+**Syntax**: `/notify <message> [--priority <level>]`
+
+**Parameters**:
+- `message` (required): The notification message to send
+- `--priority` (optional): Priority level (low, medium, high). Default: medium
+
+**Required Permissions**:
+- Bot: SEND_MESSAGES, EMBED_LINKS
+- User: MANAGE_MESSAGES (for high priority)
+
+**Examples**:
+\`\`\`
+/notify "Front door opened"
+/notify "Temperature critical!" --priority high
+\`\`\`
+
+**Response**: Confirmation message with notification ID
+```
+
+### Documentation Checklist
+
+Before committing, ensure:
+
+- [ ] **README.md updated** with feature overview and basic usage
+- [ ] **Inline comments added** for all public functions/methods
+- [ ] **JSDoc/TSDoc complete** with examples for all exported APIs
+- [ ] **Usage examples provided** showing common scenarios
+- [ ] **Error handling documented** with common errors and solutions
+- [ ] **Configuration options listed** in a clear table format
+- [ ] **Prerequisites documented** if feature has dependencies
+- [ ] **Breaking changes noted** in CHANGELOG.md if applicable
+
+### Documentation Quality Standards
+
+Good documentation is:
+
+- **Clear** - Easy to understand for target audience
+- **Concise** - No unnecessary information
+- **Complete** - Covers all use cases and edge cases
+- **Current** - Always matches the actual code behavior
+- **Examples-driven** - Shows practical usage, not just theory
+
+Bad documentation:
+
+- ❌ "This function does stuff" - Too vague
+- ❌ No examples - Users don't know how to use it
+- ❌ Outdated - Doesn't match current implementation
+- ❌ Missing error cases - Users don't know what can go wrong
+
+Good documentation:
+
+- ✅ Clear purpose and use cases
+- ✅ Multiple practical examples
+- ✅ Up-to-date with code
+- ✅ Documents errors and edge cases
+
+---
+
 ## Summary
 
-**Remember: Code without tests is incomplete code.** Every feature, bug fix, and modification must include comprehensive tests that verify correctness, handle errors, and cover edge cases.
+**Remember: Code without tests AND documentation is incomplete code.**
+
+Every feature, bug fix, and modification must include:
+1. **Comprehensive tests** - Unit, integration, error handling, and edge cases
+2. **Updated test coverage** - Modify existing tests and add new ones
+3. **Clear documentation** - Usage instructions, examples, and API docs
+
+**The feature is not done until it has tests, coverage, and documentation.**
