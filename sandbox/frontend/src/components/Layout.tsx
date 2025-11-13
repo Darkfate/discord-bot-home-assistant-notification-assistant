@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Send, Search, BarChart3, History, Flask } from 'lucide-react';
+import { Send, Search, BarChart3, History, FlaskConical } from 'lucide-react';
 import NotificationTester from './NotificationTester';
 import NotificationManager from './NotificationManager';
 import QueueMonitor from './QueueMonitor';
@@ -16,7 +16,7 @@ export default function Layout() {
     { id: 'manager' as View, label: 'Manager', icon: Search },
     { id: 'monitor' as View, label: 'Queue Monitor', icon: BarChart3 },
     { id: 'browser' as View, label: 'Browser', icon: History },
-    { id: 'tools' as View, label: 'Testing Tools', icon: Flask },
+    { id: 'tools' as View, label: 'Testing Tools', icon: FlaskConical },
   ];
 
   const renderView = () => {
