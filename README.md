@@ -22,7 +22,7 @@ A Discord bot designed for personal use with Home Assistant integration. Receive
 - Discord bot token (from Discord Developer Portal)
 - Discord channel ID where notifications will be sent
 - Docker and Docker Compose (for containerized deployment)
-- Node.js 18+ (for local development)
+- Node.js 22+ (for local development)
 
 ### 1. Set Up Discord Bot
 
