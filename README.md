@@ -57,7 +57,23 @@ Edit `.env` and add:
 - `DISCORD_CHANNEL_ID`: Your channel ID
 - `WEBHOOK_SECRET`: A random secret for webhook verification (optional)
 
-### 4. Run with Docker Compose
+### 4. Initialize Data Directory
+
+Before starting the bot, run the setup script to create the data directory with correct permissions:
+
+```bash
+./setup.sh
+```
+
+This ensures the Docker container can write to the database. If you skip this step, you may encounter a `SQLITE_READONLY` error.
+
+**Manual Setup** (if setup script doesn't work):
+```bash
+mkdir -p data
+sudo chown -R 1001:1001 data
+```
+
+### 5. Run with Docker Compose
 
 ```bash
 docker-compose up -d
@@ -65,7 +81,7 @@ docker-compose up -d
 
 The bot will start and listen for webhooks on `http://localhost:5000`
 
-### 5. Test It
+### 6. Test It
 
 Use the `/test` slash command in Discord, or send a webhook:
 
@@ -460,6 +476,16 @@ npm run lint
 - Check webhook server is running: `curl http://localhost:5000/health`
 - Check firewall allows port 5000
 - Check database is writable (permissions on `./data` directory)
+
+### Database "SQLITE_READONLY" error
+- This occurs when the Docker container can't write to the database file
+- **Solution**: Run `./setup.sh` to fix permissions, or manually run:
+  ```bash
+  mkdir -p data
+  sudo chown -R 1001:1001 data
+  ```
+- The data directory must be owned by UID 1001 (the `nodejs` user inside the container)
+- After fixing permissions, restart the container: `docker compose restart`
 
 ### Commands not showing up
 - Give it a few seconds after bot starts
