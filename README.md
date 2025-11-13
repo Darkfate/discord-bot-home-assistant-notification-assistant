@@ -19,10 +19,13 @@ A Discord bot designed for personal use with Home Assistant integration. Receive
 
 ### Prerequisites
 
+**Required:**
 - Discord bot token (from Discord Developer Portal)
 - Discord channel ID where notifications will be sent
-- Docker and Docker Compose (for containerized deployment)
-- Node.js 18+ (for local development)
+
+**Choose one:**
+- **For Docker deployment**: Docker and Docker Compose
+- **For local development**: Node.js 18+ and npm
 
 ### 1. Set Up Discord Bot
 
@@ -57,30 +60,67 @@ Edit `.env` and add:
 - `DISCORD_CHANNEL_ID`: Your channel ID
 - `WEBHOOK_SECRET`: A random secret for webhook verification (optional)
 
-### 4. Initialize Data Directory
+### 4. Choose Your Deployment Method
 
-Run the setup script to create the data directory:
+You can run the bot either with Docker (recommended for production) or locally for development.
 
+#### Option A: Run Locally (No Docker Required)
+
+1. **Prerequisites**: Ensure you have Node.js 18+ installed
+   ```bash
+   node --version  # Should be v18.0.0 or higher
+   ```
+
+2. **Run the local setup script**:
+   ```bash
+   ./run-local.sh
+   ```
+
+   The script will:
+   - Check Node.js version
+   - Create `.env` file if needed (prompts you to configure it)
+   - Create data directory
+   - Install dependencies
+   - Start the bot in development mode
+
+3. **That's it!** The bot will start and listen for webhooks on `http://localhost:5000`
+
+**Manual Setup** (if you prefer not to use the script):
 ```bash
-./setup.sh
-```
+# 1. Copy environment file
+cp .env.example .env
 
-Or manually create it:
-```bash
+# 2. Edit .env and add your Discord token and channel ID
+nano .env  # or use your preferred editor
+
+# 3. Create data directory
 mkdir -p data
+
+# 4. Install dependencies
+npm install
+
+# 5. Start the bot
+npm run dev
 ```
 
-**Note**: The Docker container automatically fixes permissions on startup, so you don't need to worry about file ownership.
+#### Option B: Run with Docker Compose
 
-### 5. Run with Docker Compose
+1. **Initialize data directory**:
+   ```bash
+   ./setup.sh
+   ```
+   Or manually: `mkdir -p data`
 
-```bash
-docker compose up --build -d
-```
+   **Note**: The Docker container automatically fixes permissions on startup.
 
-Use `--build` to ensure the image is built with the latest changes. The bot will start and listen for webhooks on `http://localhost:5000`
+2. **Start with Docker Compose**:
+   ```bash
+   docker compose up --build -d
+   ```
 
-### 6. Test It
+   Use `--build` to ensure the image is built with the latest changes. The bot will start and listen for webhooks on `http://localhost:5000`
+
+### 5. Test It
 
 Use the `/test` slash command in Discord, or send a webhook:
 
@@ -409,17 +449,35 @@ Use `/queue-stats` to monitor:
 
 ## Development
 
-### Local Setup
+### Quick Start for Development
+
+The easiest way to run the bot locally for development:
 
 ```bash
+./run-local.sh
+```
+
+This script handles all setup steps automatically and starts the bot in development mode with hot-reloading.
+
+### Manual Development Setup
+
+If you prefer to run commands manually:
+
+```bash
+# Install dependencies
 npm install
+
+# Start in development mode (with hot-reloading)
 npm run dev
 ```
 
-### Build
+### Build for Production
 
 ```bash
+# Build TypeScript to JavaScript
 npm run build
+
+# Run the built version
 npm start
 ```
 
