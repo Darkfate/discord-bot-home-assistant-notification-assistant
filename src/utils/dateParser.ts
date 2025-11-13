@@ -12,6 +12,13 @@
  * - Date object → returned as-is
  */
 
+// Time conversion constants (in milliseconds)
+const TIME_MS = {
+  MINUTE: 60 * 1000,
+  HOUR: 60 * 60 * 1000,
+  DAY: 24 * 60 * 60 * 1000,
+} as const;
+
 /**
  * Parse a scheduled time input into a Date object
  *
@@ -40,11 +47,11 @@ export function parseScheduledTime(input: string | Date): Date {
 
     switch (unit) {
       case 'm':
-        return new Date(now.getTime() + value * 60 * 1000);
+        return new Date(now.getTime() + value * TIME_MS.MINUTE);
       case 'h':
-        return new Date(now.getTime() + value * 60 * 60 * 1000);
+        return new Date(now.getTime() + value * TIME_MS.HOUR);
       case 'd':
-        return new Date(now.getTime() + value * 24 * 60 * 60 * 1000);
+        return new Date(now.getTime() + value * TIME_MS.DAY);
     }
   }
 
@@ -55,11 +62,11 @@ export function parseScheduledTime(input: string | Date): Date {
     const unit = longRelativeMatch[2].toLowerCase();
 
     if (unit.startsWith('minute')) {
-      return new Date(now.getTime() + value * 60 * 1000);
+      return new Date(now.getTime() + value * TIME_MS.MINUTE);
     } else if (unit.startsWith('hour')) {
-      return new Date(now.getTime() + value * 60 * 60 * 1000);
+      return new Date(now.getTime() + value * TIME_MS.HOUR);
     } else if (unit.startsWith('day')) {
-      return new Date(now.getTime() + value * 24 * 60 * 60 * 1000);
+      return new Date(now.getTime() + value * TIME_MS.DAY);
     }
   }
 
@@ -89,9 +96,9 @@ export function formatRelativeTime(date: Date): string {
     return 'overdue';
   }
 
-  const diffMinutes = Math.floor(diffMs / (60 * 1000));
-  const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
-  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  const diffMinutes = Math.floor(diffMs / TIME_MS.MINUTE);
+  const diffHours = Math.floor(diffMs / TIME_MS.HOUR);
+  const diffDays = Math.floor(diffMs / TIME_MS.DAY);
 
   if (diffMinutes < 1) {
     return 'in less than a minute';
