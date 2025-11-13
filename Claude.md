@@ -8,11 +8,14 @@
 2. **Update existing tests** - Modify tests affected by the changes
 3. **Write new tests** - Add comprehensive test coverage for new functionality
 4. **Implement the feature** - Write the actual code
-5. **Verify coverage** - Ensure code coverage thresholds are met
-6. **Document the feature** - Add clear usage instructions
-7. **Commit and push** - Include tests and documentation in the commit
+5. **Verify TypeScript compilation** - Run `npm run build` in all project directories
+6. **Remove unused imports** - Clean up all unused code and imports
+7. **Verify coverage** - Ensure code coverage thresholds are met
+8. **Verify package-lock.json** - Ensure lock files exist for all package.json files
+9. **Document the feature** - Add clear usage instructions
+10. **Commit and push** - Include tests and documentation in the commit
 
-**No feature is complete without tests AND documentation.**
+**No feature is complete without tests, clean TypeScript compilation, AND documentation.**
 
 ## Testing Requirements
 
@@ -263,18 +266,21 @@ Before committing any changes, Claude MUST:
 6. ✅ **Run `npm run test:coverage`** and meet coverage thresholds (minimum 70%)
 7. ✅ **Verify critical paths** have 100% coverage
 
-#### Code Quality
-8. ✅ **Run `npm run build`** to ensure TypeScript compiles
-9. ✅ **Run `npm run lint`** to ensure code style compliance
-10. ✅ **Review code** for security vulnerabilities
+#### Code Quality & Build Verification
+8. ✅ **Run `npm run build`** in ALL project directories (root AND sandbox/frontend) to ensure TypeScript compiles
+9. ✅ **Verify no unused imports** in TypeScript files
+10. ✅ **Verify all imported modules exist** (especially from third-party libraries)
+11. ✅ **Test Docker build locally** if Dockerfile or dependencies changed
+12. ✅ **Run `npm run lint`** to ensure code style compliance
+13. ✅ **Review code** for security vulnerabilities
 
 #### Documentation Requirements
-11. ✅ **Update README.md** with feature usage and examples
-12. ✅ **Add JSDoc/TSDoc comments** to all public APIs
-13. ✅ **Include usage examples** in documentation
-14. ✅ **Document error handling** and common issues
-15. ✅ **Update CHANGELOG.md** with changes
-16. ✅ **Document breaking changes** if applicable
+14. ✅ **Update README.md** with feature usage and examples
+15. ✅ **Add JSDoc/TSDoc comments** to all public APIs
+16. ✅ **Include usage examples** in documentation
+17. ✅ **Document error handling** and common issues
+18. ✅ **Update CHANGELOG.md** with changes
+19. ✅ **Document breaking changes** if applicable
 
 **All three categories (Testing, Code Quality, Documentation) must be completed before commit.**
 
@@ -349,6 +355,251 @@ Document testing approach in:
 2. **Test descriptions** - Clear, readable test names
 3. **README.md** - Add testing section with examples
 4. **Pull requests** - Include testing summary
+
+---
+
+## TypeScript and Build Quality
+
+**All TypeScript code must compile without errors before committing. This is critical for Docker builds.**
+
+### TypeScript Compilation Standards
+
+#### 1. Import Management
+
+**CRITICAL: Unused imports will cause Docker build failures.**
+
+**Good import practices:**
+- ✅ Only import what you actually use
+- ✅ Remove unused imports immediately
+- ✅ Verify imports exist in the package before using them
+- ✅ Check third-party library documentation for correct export names
+
+**Bad import practices:**
+- ❌ Leaving unused imports (e.g., `useState` when not used)
+- ❌ Importing non-existent exports from libraries (e.g., `Flask` instead of `FlaskConical` from lucide-react)
+- ❌ Importing types that are never referenced
+- ❌ Keeping imports after refactoring code that used them
+
+**Example of cleanup needed:**
+
+```typescript
+// ❌ BAD - Unused imports
+import { useState, useEffect } from 'react';
+import { Button, Select } from './ui';
+import type { User, Profile } from './types';
+
+function MyComponent() {
+  return <Button>Click me</Button>;
+}
+
+// ✅ GOOD - Only used imports
+import { Button } from './ui';
+
+function MyComponent() {
+  return <Button>Click me</Button>;
+}
+```
+
+#### 2. Third-Party Library Verification
+
+**Before using any import from a third-party library:**
+
+1. **Check the library documentation** - Verify the export name exists
+2. **Check package version** - Ensure you're using the correct version
+3. **Test locally** - Build the project to verify the import works
+4. **Common library gotchas:**
+   - Icon libraries (lucide-react, react-icons): Icon names change between versions
+   - UI libraries: Component exports may differ from documentation
+   - Type libraries: Type names must match exactly
+
+**Example verification process:**
+
+```typescript
+// Step 1: Check documentation or node_modules
+// lucide-react exports: Check node_modules/lucide-react/dist/index.d.ts
+// or official docs: https://lucide.dev
+
+// Step 2: Use correct import
+import { FlaskConical } from 'lucide-react'; // ✅ GOOD - Exists in library
+
+// NOT:
+import { Flask } from 'lucide-react'; // ❌ BAD - Doesn't exist in current version
+```
+
+#### 3. Type Safety
+
+**Avoid implicit any types:**
+
+```typescript
+// ❌ BAD - Implicit any
+const handleData = (data) => {
+  return data.value;
+};
+
+// ✅ GOOD - Explicit types
+const handleData = (data: { value: string }) => {
+  return data.value;
+};
+```
+
+**Use type imports for type-only references:**
+
+```typescript
+// ✅ GOOD - Import type separately if only used as type
+import type { NotificationCreateRequest } from '../types/api';
+
+// Also good if used as both type and value
+import { NotificationCreateRequest } from '../types/api';
+```
+
+#### 4. Pre-Commit Build Verification
+
+**MANDATORY: Always run builds before committing:**
+
+```bash
+# For root project
+cd /path/to/project
+npm run build
+
+# For sandbox frontend
+cd /path/to/project/sandbox/frontend
+npm run build
+
+# Both must complete without errors
+```
+
+**Common TypeScript errors to watch for:**
+
+- `TS6133`: Declared but never read (unused variable/import)
+- `TS2305`: Module has no exported member (wrong import name)
+- `TS7006`: Parameter implicitly has any type (missing type annotation)
+- `TS2307`: Cannot find module (missing dependency or wrong path)
+
+### Multi-Project Build Verification
+
+**This project has multiple TypeScript projects:**
+
+1. **Root project** (`/`) - Main bot application
+2. **Sandbox frontend** (`/sandbox/frontend`) - React frontend
+
+**IMPORTANT: Both projects must build successfully.**
+
+```bash
+# Test root project
+npm run build
+
+# Test sandbox frontend
+cd sandbox/frontend && npm run build
+
+# If either fails, fix errors before committing
+```
+
+### Docker Build Considerations
+
+**Docker builds will fail for any TypeScript compilation error.**
+
+#### 1. Missing package-lock.json Files
+
+**CRITICAL: Every package.json must have a corresponding package-lock.json.**
+
+```bash
+# Generate package-lock.json if missing
+cd sandbox/frontend
+npm install --package-lock-only --legacy-peer-deps
+git add package-lock.json
+```
+
+**Why this matters:**
+- `npm ci` (used in Docker) requires `package-lock.json`
+- `npm ci` installs exact versions for reproducible builds
+- Missing lock files cause immediate build failure
+
+#### 2. Dependency Management
+
+**Keep dependencies in sync:**
+
+```json
+// In package.json
+{
+  "dependencies": {
+    "react": "^18.2.0",
+    "lucide-react": "^0.292.0"
+  }
+}
+```
+
+**After adding/updating dependencies:**
+
+```bash
+# Update lock file
+npm install
+
+# Commit both files
+git add package.json package-lock.json
+```
+
+#### 3. Dockerfile Verification
+
+**When modifying frontend code, verify Docker build:**
+
+```bash
+# Test full Docker build
+docker build -t test-build .
+
+# This catches:
+# - Missing package-lock.json
+# - TypeScript compilation errors
+# - Dependency issues
+# - Build script failures
+```
+
+**If you don't have Docker locally, ensure:**
+- ✅ All `package-lock.json` files exist
+- ✅ Local `npm run build` succeeds in all directories
+- ✅ No TypeScript errors reported
+
+#### 4. Common Docker Build Failures
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `npm ci` requires package-lock.json | Missing lock file | Run `npm install --package-lock-only` |
+| Module has no exported member | Wrong import name | Check library docs, fix import |
+| Declared but never read | Unused import/variable | Remove unused code |
+| Cannot find module | Missing dependency | Add to package.json, run `npm install` |
+
+### IDE and Editor Integration
+
+**Configure your editor to catch errors early:**
+
+**VSCode settings.json:**
+```json
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": true,
+    "source.fixAll": true
+  }
+}
+```
+
+**Benefits:**
+- Auto-remove unused imports on save
+- Highlight type errors in real-time
+- Show available exports from libraries
+
+### TypeScript Best Practices Summary
+
+**Before every commit:**
+
+1. ✅ Remove all unused imports
+2. ✅ Verify all imports exist in their libraries
+3. ✅ Run `npm run build` in ALL project directories
+4. ✅ Fix all TypeScript errors (no `any` types unless necessary)
+5. ✅ Ensure package-lock.json exists for all package.json files
+6. ✅ Test Docker build if you modified dependencies or Dockerfile
+
+**Remember: TypeScript errors in development become Docker build failures in CI/CD.**
 
 ---
 
@@ -547,11 +798,37 @@ Good documentation:
 
 ## Summary
 
-**Remember: Code without tests AND documentation is incomplete code.**
+**Remember: Code without tests, clean builds, AND documentation is incomplete code.**
 
 Every feature, bug fix, and modification must include:
 1. **Comprehensive tests** - Unit, integration, error handling, and edge cases
 2. **Updated test coverage** - Modify existing tests and add new ones
-3. **Clear documentation** - Usage instructions, examples, and API docs
+3. **Clean TypeScript compilation** - No errors, no unused imports, verified builds in all directories
+4. **Valid package-lock.json files** - Present for all package.json files
+5. **Clear documentation** - Usage instructions, examples, and API docs
 
-**The feature is not done until it has tests, coverage, and documentation.**
+**The feature is not done until it has tests, compiles cleanly, and has documentation.**
+
+### Quick Pre-Commit Checklist
+
+Run these commands before every commit:
+
+```bash
+# 1. Build all projects
+npm run build
+cd sandbox/frontend && npm run build && cd ../..
+
+# 2. Run all tests
+npm test
+npm run test:coverage
+
+# 3. Verify no TypeScript errors
+# (Should be clean from step 1)
+
+# 4. Commit with descriptive message
+git add .
+git commit -m "Your descriptive commit message"
+git push
+```
+
+**If any step fails, fix the issues before pushing.**
