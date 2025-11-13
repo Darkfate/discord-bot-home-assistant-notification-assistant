@@ -59,27 +59,26 @@ Edit `.env` and add:
 
 ### 4. Initialize Data Directory
 
-Before starting the bot, run the setup script to create the data directory with correct permissions:
+Run the setup script to create the data directory:
 
 ```bash
 ./setup.sh
 ```
 
-This ensures the Docker container can write to the database. If you skip this step, you may encounter a `SQLITE_READONLY` error.
-
-**Manual Setup** (if setup script doesn't work):
+Or manually create it:
 ```bash
 mkdir -p data
-sudo chown -R 1001:1001 data
 ```
+
+**Note**: The Docker container automatically fixes permissions on startup, so you don't need to worry about file ownership.
 
 ### 5. Run with Docker Compose
 
 ```bash
-docker-compose up -d
+docker compose up --build -d
 ```
 
-The bot will start and listen for webhooks on `http://localhost:5000`
+Use `--build` to ensure the image is built with the latest changes. The bot will start and listen for webhooks on `http://localhost:5000`
 
 ### 6. Test It
 
@@ -477,15 +476,14 @@ npm run lint
 - Check firewall allows port 5000
 - Check database is writable (permissions on `./data` directory)
 
-### Database "SQLITE_READONLY" error
-- This occurs when the Docker container can't write to the database file
-- **Solution**: Run `./setup.sh` to fix permissions, or manually run:
-  ```bash
-  mkdir -p data
-  sudo chown -R 1001:1001 data
-  ```
-- The data directory must be owned by UID 1001 (the `nodejs` user inside the container)
-- After fixing permissions, restart the container: `docker compose restart`
+### Database "SQLITE_READONLY" or "SQLITE_CANTOPEN" errors
+- These errors occur when the Docker container can't access the database file
+- **Solution**: The container now automatically fixes permissions on startup
+- If you still encounter issues:
+  1. Ensure the `data` directory exists: `mkdir -p data`
+  2. Rebuild and restart the container: `docker compose up --build -d`
+  3. Check container logs: `docker compose logs discord-bot`
+- The entrypoint script automatically sets correct ownership for the nodejs user (uid 1001)
 
 ### Commands not showing up
 - Give it a few seconds after bot starts

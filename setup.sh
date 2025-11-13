@@ -7,26 +7,16 @@ echo "Setting up Discord Bot environment..."
 if [ ! -d "data" ]; then
     echo "Creating data directory..."
     mkdir -p data
-fi
-
-# Set correct permissions for the nodejs user in Docker (uid 1001)
-echo "Setting correct permissions for data directory..."
-if [ "$(uname)" == "Darwin" ]; then
-    # macOS
-    sudo chown -R 1001:1001 data
-elif [ -n "$(command -v sudo)" ]; then
-    # Linux with sudo
-    sudo chown -R 1001:1001 data
+    echo "✓ Data directory created"
 else
-    # Try without sudo
-    chown -R 1001:1001 data 2>/dev/null || echo "Warning: Could not change ownership. You may need to run: sudo chown -R 1001:1001 data"
+    echo "✓ Data directory already exists"
 fi
-
-# Verify permissions
-echo "Verifying permissions..."
-ls -la data
 
 echo ""
+echo "Note: The Docker container will automatically fix permissions on startup."
+echo ""
 echo "Setup complete! You can now run:"
-echo "  docker compose up -d"
+echo "  docker compose up --build -d"
+echo ""
+echo "Use --build to rebuild the image with the latest changes."
 echo ""
