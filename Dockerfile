@@ -1,5 +1,5 @@
 # Stage 1: Build bot service
-FROM node:20-alpine AS bot-builder
+FROM node:22-alpine AS bot-builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY src ./src
 RUN npm run build
 
 # Stage 2: Build sandbox frontend
-FROM node:20-alpine AS sandbox-builder
+FROM node:22-alpine AS sandbox-builder
 
 WORKDIR /app
 
@@ -34,7 +34,7 @@ COPY sandbox/frontend ./
 RUN npm run build
 
 # Stage 3: Production image
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
