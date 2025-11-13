@@ -72,6 +72,13 @@ You can run the bot either with Docker (recommended for production) or locally f
    ```
 
 2. **Run the local setup script**:
+
+   **On Windows:**
+   ```cmd
+   run-local.bat
+   ```
+
+   **On Linux/Mac:**
    ```bash
    ./run-local.sh
    ```
@@ -86,6 +93,26 @@ You can run the bot either with Docker (recommended for production) or locally f
 3. **That's it!** The bot will start and listen for webhooks on `http://localhost:5000`
 
 **Manual Setup** (if you prefer not to use the script):
+
+**On Windows:**
+```cmd
+# 1. Copy environment file
+copy .env.example .env
+
+# 2. Edit .env and add your Discord token and channel ID
+notepad .env
+
+# 3. Create data directory
+mkdir data
+
+# 4. Install dependencies
+npm install
+
+# 5. Start the bot
+npm run dev
+```
+
+**On Linux/Mac:**
 ```bash
 # 1. Copy environment file
 cp .env.example .env
@@ -453,6 +480,12 @@ Use `/queue-stats` to monitor:
 
 The easiest way to run the bot locally for development:
 
+**On Windows:**
+```cmd
+run-local.bat
+```
+
+**On Linux/Mac:**
 ```bash
 ./run-local.sh
 ```
