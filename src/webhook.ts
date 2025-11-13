@@ -10,6 +10,12 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Pagination defaults
+const PAGINATION_DEFAULTS = {
+  LIMIT: 25,
+  OFFSET: 0,
+} as const;
+
 export class WebhookServer {
   private app: express.Application;
   private queue: PersistentNotificationQueue;
@@ -39,12 +45,7 @@ export class WebhookServer {
     // Webhook endpoint for notifications (with scheduling support)
     this.app.post('/webhook/notify', async (req: Request, res: Response) => {
       // Verify webhook secret if provided
-      if (this.webhookSecret) {
-        const signature = req.headers['x-webhook-signature'] as string;
-        if (!signature || !this.verifySignature(req.body, signature)) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-      }
+      if (!this.checkSignature(req, res)) return;
 
       try {
         const { source, title, message, severity, scheduled_for } = req.body;
@@ -186,12 +187,7 @@ export class WebhookServer {
 
     // Endpoint to send direct message (for testing - kept for backward compatibility)
     this.app.post('/webhook/message', async (req: Request, res: Response) => {
-      if (this.webhookSecret) {
-        const signature = req.headers['x-webhook-signature'] as string;
-        if (!signature || !this.verifySignature(req.body, signature)) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-      }
+      if (!this.checkSignature(req, res)) return;
 
       try {
         const { source, message } = req.body;
@@ -248,8 +244,8 @@ export class WebhookServer {
           status,
           source,
           search,
-          limit = '25',
-          offset = '0',
+          limit = String(PAGINATION_DEFAULTS.LIMIT),
+          offset = String(PAGINATION_DEFAULTS.OFFSET),
           sort = 'created_at',
           order = 'DESC',
         } = req.query;
@@ -328,6 +324,21 @@ export class WebhookServer {
       .digest('hex');
 
     return hash === signature;
+  }
+
+  /**
+   * Verify webhook signature and return 401 if invalid
+   * @returns true if signature is valid or no secret is set, false if invalid
+   */
+  private checkSignature(req: Request, res: Response): boolean {
+    if (this.webhookSecret) {
+      const signature = req.headers['x-webhook-signature'] as string;
+      if (!signature || !this.verifySignature(req.body, signature)) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return false;
+      }
+    }
+    return true;
   }
 
   start(port: number): void {

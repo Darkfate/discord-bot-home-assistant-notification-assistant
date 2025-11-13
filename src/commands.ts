@@ -7,7 +7,7 @@ import {
   ChatInputCommandInteraction,
   EmbedBuilder,
 } from 'discord.js';
-import { Database, NotificationStatus } from './database.js';
+import { Database, NotificationStatus, QueuedNotification } from './database.js';
 import { PersistentNotificationQueue } from './queue/persistentQueue.js';
 import { formatRelativeTime } from './utils/dateParser.js';
 
@@ -15,6 +15,19 @@ interface Command {
   data: any;
   execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
 }
+
+// Discord embed colors
+const DISCORD_COLORS = {
+  INFO: 0x3498db,
+  SUCCESS: 0x2ecc71,
+} as const;
+
+// Health monitoring thresholds
+const HEALTH_THRESHOLDS = {
+  FAILED_WARNING: 5,
+  FAILED_CRITICAL: 10,
+  QUEUE_DEPTH_WARNING: 100,
+} as const;
 
 export class CommandHandler {
   private commands: Collection<string, Command>;
@@ -33,6 +46,16 @@ export class CommandHandler {
     this.queue = queue;
 
     this.registerCommands();
+  }
+
+  /**
+   * Format a notification preview with title and truncated message
+   */
+  private formatNotificationPreview(notification: QueuedNotification, maxLength: number = 100): string {
+    const preview = notification.message.substring(0, maxLength);
+    const ellipsis = notification.message.length > maxLength ? '...' : '';
+    const title = notification.title ? `_${notification.title}_\n` : '';
+    return `${title}${preview}${ellipsis}`;
   }
 
   private registerCommands(): void {
@@ -65,7 +88,7 @@ export class CommandHandler {
           : 'None';
 
         const embed = new EmbedBuilder()
-          .setColor(0x3498db)
+          .setColor(DISCORD_COLORS.INFO)
           .setTitle('Bot Status')
           .addFields(
             { name: 'Uptime', value: `${hours}h ${minutes}m`, inline: true },
@@ -127,7 +150,7 @@ export class CommandHandler {
           .map((n) => {
             const statusEmoji = this.getStatusEmoji(n.status);
             const dateStr = n.createdAt.toLocaleString();
-            return `${statusEmoji} **${n.source}** [ID: ${n.id}] - ${dateStr}\n${n.title ? `_${n.title}_\n` : ''}${n.message.substring(0, 100)}${n.message.length > 100 ? '...' : ''}`;
+            return `${statusEmoji} **${n.source}** [ID: ${n.id}] - ${dateStr}\n${this.formatNotificationPreview(n)}`;
           })
           .join('\n\n');
 
@@ -231,7 +254,7 @@ export class CommandHandler {
         const scheduledText = scheduled
           .map((n) => {
             const timeStr = formatRelativeTime(n.scheduledFor);
-            return `**[ID: ${n.id}]** ${n.source} - ${timeStr}\n${n.title ? `_${n.title}_\n` : ''}${n.message.substring(0, 100)}${n.message.length > 100 ? '...' : ''}`;
+            return `**[ID: ${n.id}]** ${n.source} - ${timeStr}\n${this.formatNotificationPreview(n)}`;
           })
           .join('\n\n');
 
@@ -320,7 +343,7 @@ export class CommandHandler {
 
         const failedText = failed
           .map((n) => {
-            return `**[ID: ${n.id}]** ${n.source} - Retries: ${n.retryCount}/${n.maxRetries}\n${n.title ? `_${n.title}_\n` : ''}${n.message.substring(0, 80)}${n.message.length > 80 ? '...' : ''}\nError: ${n.lastError || 'Unknown'}`;
+            return `**[ID: ${n.id}]** ${n.source} - Retries: ${n.retryCount}/${n.maxRetries}\n${this.formatNotificationPreview(n, 80)}\nError: ${n.lastError || 'Unknown'}`;
           })
           .join('\n\n');
 
@@ -342,7 +365,7 @@ export class CommandHandler {
         const totalInQueue = stats.pending + stats.processing + stats.scheduled;
 
         const embed = new EmbedBuilder()
-          .setColor(0x2ecc71)
+          .setColor(DISCORD_COLORS.SUCCESS)
           .setTitle('Queue Statistics')
           .setDescription('Detailed statistics about the notification queue')
           .addFields(
@@ -360,11 +383,11 @@ export class CommandHandler {
 
         // Add health indicator
         let healthStatus = '🟢 Healthy';
-        if (stats.failed > 10) {
+        if (stats.failed > HEALTH_THRESHOLDS.FAILED_CRITICAL) {
           healthStatus = '🔴 High Failure Rate';
-        } else if (totalInQueue > 100) {
+        } else if (totalInQueue > HEALTH_THRESHOLDS.QUEUE_DEPTH_WARNING) {
           healthStatus = '🟡 High Queue Depth';
-        } else if (stats.failed > 5) {
+        } else if (stats.failed > HEALTH_THRESHOLDS.FAILED_WARNING) {
           healthStatus = '🟡 Some Failures';
         }
 
