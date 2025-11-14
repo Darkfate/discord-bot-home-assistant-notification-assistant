@@ -17,6 +17,218 @@
 
 **No feature is complete without tests, clean TypeScript compilation, AND documentation.**
 
+## Scope Management Guidelines
+
+**CRITICAL: Only implement features that are explicitly requested and within the defined scope.**
+
+### Core Principles
+
+#### 1. Stick to the Defined Scope
+
+**When implementing a feature:**
+- ✅ **DO** implement exactly what was requested
+- ✅ **DO** focus on the specific problem being solved
+- ✅ **DO** implement features that are explicitly mentioned in the task description
+- ❌ **DO NOT** add extra features "while you're at it"
+- ❌ **DO NOT** implement related but unrequested functionality
+- ❌ **DO NOT** over-engineer solutions with unnecessary abstractions
+- ❌ **DO NOT** expand scope without explicit user approval
+
+**Example of good scope adherence:**
+```
+User request: "Add a /status command that shows bot uptime"
+✅ GOOD: Implement /status command that displays uptime
+❌ BAD: Also add /health, /metrics, /diagnostics commands without being asked
+```
+
+**Example of scope creep to avoid:**
+```
+User request: "Fix the notification queue to handle duplicates"
+✅ GOOD: Add duplicate detection to the queue
+❌ BAD: Also rewrite the entire queue system with Redis, add retry logic,
+        implement priority queues, add metrics, etc.
+```
+
+#### 2. When in Doubt, Ask for Clarification
+
+**If you encounter any of these situations, STOP and ask the user:**
+
+- **Ambiguous requirements** - Multiple valid interpretations exist
+  - Example: "Add logging" - What should be logged? What log level? Where?
+
+- **Missing specifications** - Critical details not provided
+  - Example: "Add rate limiting" - What limits? Per user? Per server? Time window?
+
+- **Implementation choices** - Multiple valid technical approaches
+  - Example: "Add caching" - In-memory? Redis? What's the cache invalidation strategy?
+
+- **Scope boundaries** - Unclear if something is in or out of scope
+  - Example: "Improve error handling" - Just for webhooks? For entire application?
+
+- **Trade-offs** - Different approaches have different pros/cons
+  - Example: "Make it faster" - Optimize for memory or CPU? Acceptable trade-offs?
+
+**Good clarification questions:**
+```
+User: "Add user authentication"
+Claude: "I can help with that. To implement this correctly, I need to clarify a few things:
+- What authentication method should I use? (OAuth, JWT, session-based, API keys?)
+- Should I integrate with an existing auth provider (Discord, Google, etc.) or implement custom auth?
+- What user roles/permissions are needed?
+- Should I add user registration, or only login for existing users?"
+```
+
+**Bad assumption-making:**
+```
+User: "Add user authentication"
+Claude: "I'll implement OAuth 2.0 with Google and GitHub providers, add role-based
+        access control with 5 different roles, implement password reset, 2FA,
+        session management, and audit logging."
+❌ This makes too many assumptions and expands scope without confirmation
+```
+
+#### 3. Avoid "Nice to Have" Additions
+
+**Do NOT add features just because they seem useful:**
+
+❌ **Avoid adding without request:**
+- Extra logging "for debugging purposes"
+- Additional validation "to be safe"
+- Extra configuration options "for flexibility"
+- Metrics and monitoring "for observability"
+- Alternative implementations "for future use"
+- Utility functions "that might be useful later"
+
+✅ **Only add when explicitly requested:**
+- Features mentioned in the task description
+- Features confirmed by the user during clarification
+- Critical dependencies required for the requested feature to work
+
+**Example of unnecessary additions:**
+```typescript
+// User asked to add a simple /ping command
+
+// ❌ BAD - Scope creep
+class PingCommand {
+  private metrics: MetricsCollector;        // Not requested
+  private logger: Logger;                   // Not requested
+  private cache: Cache;                     // Not requested
+  private rateLimiter: RateLimiter;        // Not requested
+
+  async execute() {
+    this.metrics.increment('ping.count');  // Not requested
+    this.logger.info('Ping executed');     // Not requested
+    const cached = await this.cache.get(); // Not requested
+    // ... complex implementation
+  }
+}
+
+// ✅ GOOD - Minimal, focused implementation
+async function handlePing(): Promise<string> {
+  return 'Pong!';
+}
+```
+
+#### 4. Recognize Implicit vs Explicit Requirements
+
+**Explicit requirements** - Clearly stated, implement these:
+- "Add a /notify command"
+- "Fix the database connection error"
+- "Update the README with setup instructions"
+
+**Implicit requirements** - Necessary for explicit requirements to work:
+- If adding a command, basic error handling is implicit
+- If fixing a bug, a test to prevent regression is implicit (per our testing guidelines)
+- If adding a feature, updating related documentation is implicit (per our documentation guidelines)
+
+**NOT implicit** - Do not assume these are needed:
+- Performance optimizations (unless requested or clearly needed)
+- Additional features in the same area
+- Architectural changes or refactoring
+- Alternative implementations
+- Extra safety checks beyond standard practice
+
+#### 5. Breaking Down Ambiguous Requests
+
+**When a request could mean different things, break it down:**
+
+```
+User: "Improve the notification system"
+
+Claude: "I can help improve the notification system. This request could mean several things:
+
+1. Fix bugs in the current notification system?
+2. Add new notification types or features?
+3. Improve performance (faster delivery, better queuing)?
+4. Enhance reliability (retry logic, error handling)?
+5. Add configuration options (customize format, channels)?
+
+Which aspect would you like me to focus on? Or is there a specific issue you're experiencing?"
+```
+
+**Don't assume - Ask first, implement second.**
+
+### Scope Management Checklist
+
+Before implementing any feature, verify:
+
+- [ ] **Requirement is explicit** - Clearly stated by the user
+- [ ] **Scope is clear** - No ambiguity about what to implement
+- [ ] **Boundaries are defined** - Know what's in scope and out of scope
+- [ ] **Approach is confirmed** - If multiple approaches exist, user has chosen one
+- [ ] **Implicit needs identified** - Only including necessary dependencies, not "nice to haves"
+
+If you cannot check all boxes, **ask for clarification before proceeding**.
+
+### Examples of Good Scope Management
+
+**Example 1: Clear scope, proceed directly**
+```
+User: "Add a /uptime command that shows how long the bot has been running in hours and minutes"
+✅ Scope is clear, implement exactly as requested
+```
+
+**Example 2: Ambiguous scope, ask for clarification**
+```
+User: "Make the bot more reliable"
+❌ Too vague
+✅ Ask: "What reliability issues are you experiencing? Are you seeing crashes,
+       missed messages, slow responses, or something else?"
+```
+
+**Example 3: Multiple approaches, confirm choice**
+```
+User: "Add caching to improve performance"
+❌ Don't assume implementation
+✅ Ask: "I can implement caching. To choose the best approach:
+       - In-memory caching (simple, fast, but lost on restart)?
+       - Redis caching (persistent, shareable, requires Redis server)?
+       - What data should be cached?
+       - What's an acceptable cache lifetime?"
+```
+
+**Example 4: Boundary unclear, clarify scope**
+```
+User: "Fix the error handling"
+❌ Don't fix error handling everywhere
+✅ Ask: "I can improve error handling. Should I focus on:
+       - A specific component (commands, webhooks, database)?
+       - The entire application?
+       - A particular error you're experiencing?"
+```
+
+### Summary
+
+**Golden Rule: When uncertain about scope, always ask. Never assume.**
+
+- Implement only what's explicitly requested
+- Ask questions when requirements are ambiguous
+- Avoid adding unrequested features
+- Stick to the minimum viable implementation
+- Get user confirmation before expanding scope
+
+**Remember: It's better to ask a clarifying question than to implement the wrong thing.**
+
 ## Testing Requirements
 
 **All features added or modified by Claude MUST include appropriate testing.**
