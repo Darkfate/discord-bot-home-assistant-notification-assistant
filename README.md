@@ -619,6 +619,42 @@ npm run lint
 docker-compose up -d
 ```
 
+### Updating Docker Instance
+
+To update your running Docker container with the latest changes:
+
+**On Windows:**
+```cmd
+update.bat
+```
+
+**On Linux/Mac:**
+```bash
+./update.sh
+```
+
+The update script will:
+1. Pull the latest code from git (if applicable)
+2. Stop the current container
+3. Pull latest base images
+4. Rebuild the Docker image with latest changes
+5. Start the updated container
+6. Show status and recent logs
+
+**Manual update:**
+```bash
+# Pull latest code
+git pull
+
+# Rebuild and restart
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+
+# View logs
+docker compose logs -f
+```
+
 ### Build image manually
 
 ```bash
