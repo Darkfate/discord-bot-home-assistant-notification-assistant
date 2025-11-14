@@ -82,7 +82,7 @@ describe('CommandHandler', () => {
       expect(mockClient.application?.commands.set).toHaveBeenCalled();
       const commandData = (mockClient.application?.commands.set as jest.Mock).mock
         .calls[0][0];
-      expect(commandData).toHaveLength(10); // ping, status, history, test, schedule, scheduled, cancel, retry, failed, queue-stats
+      expect(commandData).toHaveLength(11); // ping, status, history, test, schedule, scheduled, cancel, retry, failed, queue-stats, remind
     });
   });
 
@@ -332,6 +332,82 @@ describe('CommandHandler', () => {
         expect.objectContaining({
           embeds: expect.any(Array),
         })
+      );
+    });
+  });
+
+  describe('handleInteraction - remind command', () => {
+    beforeEach(() => {
+      mockInteraction.user = { username: 'testuser' } as any;
+    });
+
+    it('should set a reminder', async () => {
+      mockInteraction.commandName = 'remind';
+      (mockInteraction.options.getString as any).mockImplementation((name: string) => {
+        const values: Record<string, string> = {
+          time: '2h',
+          message: 'Take out the trash',
+        };
+        return values[name] || null;
+      });
+      mockQueue.enqueue.mockResolvedValue(99);
+
+      await commandHandler.handleInteraction(mockInteraction as any);
+
+      expect(mockInteraction.deferReply).toHaveBeenCalled();
+      expect(mockQueue.enqueue).toHaveBeenCalledWith({
+        source: 'Reminder',
+        title: 'Reminder for testuser',
+        message: 'Take out the trash',
+        severity: 'info',
+        scheduledFor: '2h',
+      });
+      expect(mockInteraction.editReply).toHaveBeenCalledWith(
+        expect.stringContaining('✅ Reminder set!')
+      );
+    });
+
+    it('should handle invalid time format', async () => {
+      mockInteraction.commandName = 'remind';
+      (mockInteraction.options.getString as any).mockImplementation((name: string) => {
+        const values: Record<string, string> = {
+          time: 'invalid',
+          message: 'Test reminder',
+        };
+        return values[name] || null;
+      });
+      mockQueue.enqueue.mockRejectedValue(new Error('Invalid date format: invalid'));
+
+      await commandHandler.handleInteraction(mockInteraction as any);
+
+      expect(mockInteraction.deferReply).toHaveBeenCalled();
+      expect(mockInteraction.editReply).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to set reminder')
+      );
+    });
+
+    it('should work with different time units', async () => {
+      mockInteraction.commandName = 'remind';
+      (mockInteraction.options.getString as any).mockImplementation((name: string) => {
+        const values: Record<string, string> = {
+          time: '30m',
+          message: 'Meeting in 30 minutes',
+        };
+        return values[name] || null;
+      });
+      mockQueue.enqueue.mockResolvedValue(100);
+
+      await commandHandler.handleInteraction(mockInteraction as any);
+
+      expect(mockQueue.enqueue).toHaveBeenCalledWith({
+        source: 'Reminder',
+        title: 'Reminder for testuser',
+        message: 'Meeting in 30 minutes',
+        severity: 'info',
+        scheduledFor: '30m',
+      });
+      expect(mockInteraction.editReply).toHaveBeenCalledWith(
+        expect.stringContaining('✅ Reminder set!')
       );
     });
   });
