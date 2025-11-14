@@ -1,5 +1,7 @@
 # Complete Code Analysis: Discord Bot for Home Assistant Notifications
 
+> **Note**: This document provides a historical code analysis. For the most up-to-date API endpoints, slash commands, and features, please refer to the main README.md file.
+
 ## 📋 Project Overview
 
 This is a **Discord notification bot** that serves as a bridge between Home Assistant (or any service) and Discord. It receives webhook notifications and reliably delivers them to a Discord channel while maintaining a searchable history.
@@ -292,7 +294,7 @@ interaction.reply() to Discord
 
 ## 🐳 Docker Deployment
 
-**Base Image**: `node:20-alpine` (minimal footprint)
+**Base Image**: `node:22-alpine` (minimal footprint)
 
 **Features**:
 - Multi-stage build for smaller image size
@@ -411,7 +413,7 @@ The codebase is well-organized, properly typed, and follows modern Node.js/TypeS
 
 ### Technology Stack Summary:
 - **Language**: TypeScript (ES2020)
-- **Runtime**: Node.js 20
+- **Runtime**: Node.js 22
 - **Framework**: Discord.js 14, Express 4
 - **Database**: SQLite3
 - **Queue**: p-queue
