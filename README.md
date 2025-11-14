@@ -64,9 +64,9 @@ You can run the bot either with Docker (recommended for production) or locally f
 
 #### Option A: Run Locally (No Docker Required)
 
-1. **Prerequisites**: Ensure you have Node.js 18+ installed
+1. **Prerequisites**: Ensure you have Node.js 22+ installed
    ```bash
-   node --version  # Should be v18.0.0 or higher
+   node --version  # Should be v22.0.0 or higher
    ```
 
 2. **Run the local setup script**:
@@ -250,6 +250,63 @@ Manually retry a failed notification.
 }
 ```
 
+### Get Queue Statistics
+
+**Endpoint**: `GET /webhook/stats`
+
+Get queue statistics with health indicator.
+
+**Response**: `200 OK`
+```json
+{
+  "pending": 2,
+  "processing": 0,
+  "scheduled": 5,
+  "failed": 0,
+  "sent24h": 42,
+  "health": "healthy"
+}
+```
+
+**Health Indicators**:
+- `healthy`: No failed notifications
+- `degraded`: 1-5 failed notifications
+- `unhealthy`: 6+ failed notifications
+
+### List Notifications
+
+**Endpoint**: `GET /webhook/notifications`
+
+Query notifications with filtering, search, and pagination.
+
+**Query Parameters**:
+- `status` (optional): Filter by status (`pending`, `sent`, `failed`, `cancelled`)
+- `source` (optional): Filter by notification source
+- `search` (optional): Full-text search in message and title
+- `limit` (optional): Number of results per page (default: 10)
+- `offset` (optional): Number of results to skip (default: 0)
+- `sort` (optional): Sort field (`created_at`, `scheduled_for`, `sent_at`, `status`)
+- `order` (optional): Sort order (`ASC`, `DESC`)
+
+**Response**: `200 OK`
+```json
+{
+  "notifications": [...],
+  "total": 100,
+  "page": 1,
+  "limit": 10
+}
+```
+
+**Example**:
+```bash
+# Get all failed notifications
+curl "http://localhost:5000/webhook/notifications?status=failed&limit=20"
+
+# Search notifications
+curl "http://localhost:5000/webhook/notifications?search=door&limit=10"
+```
+
 ### Health Check
 
 **Endpoint**: `GET /health`
@@ -422,9 +479,9 @@ Database file location: `./data/bot.db` (mounted in Docker)
 - `discord_message_id`: Discord message ID after sending
 - `status`: pending, processing, sent, failed, or cancelled
 - `retry_count`: Number of retry attempts
-- `max_retries`: Maximum retries allowed
+- `max_retries`: Maximum retries allowed (fixed at 3)
 - `last_error`: Error message from last failure
-- `metadata`: JSON field for additional data
+- `metadata`: JSON field for additional data (reserved for future use)
 
 ### Query Examples
 
@@ -472,10 +529,10 @@ Set these environment variables to customize queue behavior:
 
 ```bash
 QUEUE_RETRY_BASE_DELAY=60        # Base delay between retries (seconds)
-QUEUE_MAX_RETRIES=3               # Maximum retry attempts per notification
 QUEUE_SCHEDULER_INTERVAL=30       # How often to check for due notifications (seconds)
-QUEUE_CLEANUP_DAYS=90             # Delete old sent notifications after N days
 ```
+
+**Note**: Maximum retry attempts is fixed at 3 retries per notification.
 
 ### Monitoring
 
@@ -561,11 +618,8 @@ npm run lint
 | `WEBHOOK_PORT` | Port for webhook server | ❌ | 5000 |
 | `WEBHOOK_SECRET` | Secret for webhook verification | ❌ | - |
 | `DATABASE_PATH` | Path to SQLite database | ❌ | ./data/bot.db |
-| `LOG_LEVEL` | Logging level | ❌ | info |
 | `QUEUE_RETRY_BASE_DELAY` | Base retry delay (seconds) | ❌ | 60 |
-| `QUEUE_MAX_RETRIES` | Max retry attempts | ❌ | 3 |
 | `QUEUE_SCHEDULER_INTERVAL` | Scheduler check interval (seconds) | ❌ | 30 |
-| `QUEUE_CLEANUP_DAYS` | Delete old notifications after N days | ❌ | 90 |
 
 ## Troubleshooting
 

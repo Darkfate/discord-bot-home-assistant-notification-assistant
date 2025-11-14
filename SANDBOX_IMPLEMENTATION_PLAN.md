@@ -15,7 +15,7 @@ UI Framework:       Tailwind CSS + shadcn/ui components
 HTTP Client:        Axios
 State Management:   React Query (server state) + Zustand (client state)
 Backend:            Express.js (simple BFF for serving static files + proxying)
-Container:          Node.js 20-alpine (multi-stage build)
+Container:          Node.js 22-alpine (multi-stage build)
 ```
 
 **Rationale:**
@@ -379,7 +379,7 @@ app.listen(PORT, () => {
 **File: `sandbox/Dockerfile`**
 ```dockerfile
 # Stage 1: Build frontend
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY sandbox/frontend/package*.json ./
 RUN npm ci
@@ -387,7 +387,7 @@ COPY sandbox/frontend/ ./
 RUN npm run build
 
 # Stage 2: Build server
-FROM node:20-alpine AS server-builder
+FROM node:22-alpine AS server-builder
 WORKDIR /app/server
 COPY sandbox/server/package*.json ./
 RUN npm ci
@@ -395,7 +395,7 @@ COPY sandbox/server/ ./
 RUN npm run build
 
 # Stage 3: Production
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 
 # Copy server build
@@ -987,7 +987,7 @@ Create `docs/SANDBOX_USER_GUIDE.md` with:
   "devDependencies": {
     "typescript": "^5.3.0",
     "@types/express": "^4.17.0",
-    "@types/node": "^20.0.0",
+    "@types/node": "^22.0.0",
     "ts-node": "^10.9.0"
   }
 }
