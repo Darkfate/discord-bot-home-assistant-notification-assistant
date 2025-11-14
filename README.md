@@ -271,6 +271,9 @@ Manually retry a failed notification.
   - Filter by status: `all`, `pending`, `sent`, `failed`, `cancelled`
 
 ### Queue Management
+- `/remind <time> <message>`: Set a reminder to be sent later
+  - Example: `/remind time:"2h" message:"Check the oven"`
+  - Example: `/remind time:"30m" message:"Meeting in 30 minutes"`
 - `/schedule <time> <source> <message> [title] [severity]`: Schedule a notification
   - Example: `/schedule time:"2h" source:"Reminder" message:"Check the oven"`
 - `/scheduled [limit]`: List upcoming scheduled notifications
@@ -308,9 +311,21 @@ curl -X POST http://localhost:5000/webhook/notify \
 
 ### Using Discord Commands
 
+**Set a simple reminder:**
+```
+/remind time:"5m" message:"Quick reminder"
+/remind time:"2h" message:"Check the oven"
+/remind time:"1d" message:"Call mom"
+```
+
+**Schedule a notification with more options:**
 ```
 /schedule time:"5m" source:"Test" message:"Quick reminder"
 /schedule time:"1d" source:"Daily" message:"Daily standup" severity:"info"
+```
+
+**Manage scheduled notifications:**
+```
 /scheduled
 /cancel id:42
 ```

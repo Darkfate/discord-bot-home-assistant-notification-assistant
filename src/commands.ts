@@ -413,6 +413,53 @@ export class CommandHandler {
         await interaction.editReply(`Test notification queued! (ID: ${notificationId})`);
       },
     });
+
+    // Remind command
+    this.commands.set('remind', {
+      data: new SlashCommandBuilder()
+        .setName('remind')
+        .setDescription('Set a reminder to be sent later')
+        .addStringOption((option) =>
+          option
+            .setName('time')
+            .setDescription('When to remind you (e.g., "5m", "2h", "1d")')
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName('message')
+            .setDescription('What to remind you about')
+            .setRequired(true)
+        ),
+      execute: async (interaction: ChatInputCommandInteraction) => {
+        await interaction.deferReply();
+
+        const time = interaction.options.getString('time', true);
+        const message = interaction.options.getString('message', true);
+        const username = interaction.user.username;
+
+        try {
+          const notificationId = await this.queue.enqueue({
+            source: 'Reminder',
+            title: `Reminder for ${username}`,
+            message,
+            severity: 'info',
+            scheduledFor: time,
+          });
+
+          const timeMs = this.parseTimeToMs(time);
+          const scheduledDate = new Date(Date.now() + timeMs);
+
+          await interaction.editReply(
+            `✅ Reminder set! (ID: ${notificationId})\nI'll remind you ${formatRelativeTime(scheduledDate)}`
+          );
+        } catch (error) {
+          await interaction.editReply(
+            `Failed to set reminder: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
   }
 
   private getStatusEmoji(status: NotificationStatus): string {
