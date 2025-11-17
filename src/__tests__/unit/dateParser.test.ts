@@ -134,32 +134,38 @@ describe('dateParser', () => {
     });
 
     it('should format minutes correctly', () => {
-      const date = new Date(Date.now() + 5 * 60 * 1000);
+      // Add 500ms buffer to prevent timing issues causing rounding down
+      const date = new Date(Date.now() + 5 * 60 * 1000 + 500);
       expect(formatRelativeTime(date)).toBe('in 5 minutes');
     });
 
     it('should format single minute correctly', () => {
-      const date = new Date(Date.now() + 1 * 60 * 1000);
+      // Add 500ms buffer to prevent timing issues causing rounding down
+      const date = new Date(Date.now() + 1 * 60 * 1000 + 500);
       expect(formatRelativeTime(date)).toBe('in 1 minute');
     });
 
     it('should format hours correctly', () => {
-      const date = new Date(Date.now() + 2 * 60 * 60 * 1000);
+      // Add 500ms buffer to prevent timing issues causing rounding down
+      const date = new Date(Date.now() + 2 * 60 * 60 * 1000 + 500);
       expect(formatRelativeTime(date)).toBe('in 2 hours');
     });
 
     it('should format single hour correctly', () => {
-      const date = new Date(Date.now() + 1 * 60 * 60 * 1000);
+      // Add 500ms buffer to prevent timing issues causing rounding down
+      const date = new Date(Date.now() + 1 * 60 * 60 * 1000 + 500);
       expect(formatRelativeTime(date)).toBe('in 1 hour');
     });
 
     it('should format days correctly', () => {
-      const date = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+      // Add 500ms buffer to prevent timing issues causing rounding down
+      const date = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000 + 500);
       expect(formatRelativeTime(date)).toBe('in 3 days');
     });
 
     it('should format single day correctly', () => {
-      const date = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
+      // Add 500ms buffer to prevent timing issues causing rounding down
+      const date = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000 + 500);
       expect(formatRelativeTime(date)).toBe('in 1 day');
     });
   });
