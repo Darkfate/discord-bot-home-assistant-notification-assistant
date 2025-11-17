@@ -131,15 +131,26 @@ npm run dev
 
 #### Option B: Run with Docker Compose
 
-1. **Initialize data directory**:
+1. **Initialize data and config directories**:
    ```bash
    ./setup.sh
    ```
-   Or manually: `mkdir -p data`
+   Or manually:
+   ```bash
+   mkdir -p data
+   mkdir -p config
+   ```
 
    **Note**: The Docker container automatically fixes permissions on startup.
 
-2. **Start with Docker Compose**:
+2. **(Optional) Set up Home Assistant permissions**:
+   If using Home Assistant integration, create the permissions config:
+   ```bash
+   cp config/ha-permissions.json.example config/ha-permissions.json
+   # Edit config/ha-permissions.json and add your Discord user IDs
+   ```
+
+3. **Start with Docker Compose**:
    ```bash
    docker compose up --build -d
    ```

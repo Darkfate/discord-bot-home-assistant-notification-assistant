@@ -17,10 +17,12 @@ services:
       - HA_ACCESS_TOKEN=${HA_ACCESS_TOKEN}
       - HA_VERIFY_SSL=${HA_VERIFY_SSL:-true}
       - HA_TIMEOUT=${HA_TIMEOUT:-10000}
+      - HA_PERMISSIONS_CONFIG=${HA_PERMISSIONS_CONFIG:-/app/config/ha-permissions.json}
     ports:
       - "5000:5000"  # Serves both webhook API and sandbox UI
     volumes:
       - ./data:/app/data
+      - ./config:/app/config
     restart: unless-stopped
     networks:
       - home-server
