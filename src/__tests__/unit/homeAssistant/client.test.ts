@@ -1,8 +1,9 @@
+import { jest } from '@jest/globals';
 import { HomeAssistantClient } from '../../../homeAssistant/client.js';
 import type { HAAutomation } from '../../../homeAssistant/types.js';
 
 // Mock fetch
-global.fetch = jest.fn();
+global.fetch = jest.fn() as any;
 
 describe('HomeAssistantClient', () => {
   let client: HomeAssistantClient;
@@ -113,15 +114,17 @@ describe('HomeAssistantClient', () => {
       ).rejects.toThrow('Failed to trigger automation');
     });
 
-    it('should throw error on timeout', async () => {
-      (global.fetch as jest.Mock).mockImplementationOnce(() =>
-        new Promise((resolve) => setTimeout(resolve, 10000))
-      );
+    it('should throw error on network timeout', async () => {
+      // Mock an AbortError (what happens when timeout occurs)
+      const abortError = new Error('The operation was aborted');
+      abortError.name = 'AbortError';
+
+      (global.fetch as jest.Mock).mockRejectedValueOnce(abortError);
 
       await expect(
         client.triggerAutomation('automation.test')
       ).rejects.toThrow('timed out');
-    }, 10000);
+    });
   });
 
   describe('listAutomations', () => {

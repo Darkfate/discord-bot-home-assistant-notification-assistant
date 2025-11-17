@@ -1,13 +1,9 @@
+import { jest } from '@jest/globals';
 import { AutomationTriggerQueue } from '../../../homeAssistant/automationQueue.js';
 import { Database } from '../../../database.js';
 import { HomeAssistantClient } from '../../../homeAssistant/client.js';
 import { Client } from 'discord.js';
 import type { AutomationTrigger } from '../../../homeAssistant/types.js';
-
-// Mock dependencies
-jest.mock('../../../database.js');
-jest.mock('../../../homeAssistant/client.js');
-jest.mock('discord.js');
 
 describe('AutomationTriggerQueue', () => {
   let queue: AutomationTriggerQueue;

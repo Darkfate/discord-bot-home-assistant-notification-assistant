@@ -56,6 +56,7 @@ describe('CommandHandler', () => {
     // @ts-ignore - Mock setup for testing
     mockInteraction = {
       isCommand: jest.fn<any>().mockReturnValue(true),
+      isAutocomplete: jest.fn<any>().mockReturnValue(false),
       commandName: '',
       reply: jest.fn<any>().mockResolvedValue({} as InteractionResponse),
       editReply: jest.fn<any>().mockResolvedValue({} as InteractionResponse),
