@@ -72,7 +72,7 @@ export class HomeAssistantClient {
       throw new Error(`Failed to list automations: ${error.message}`);
     }
 
-    const entities: HAAutomation[] = await response.json();
+    const entities = await response.json() as HAAutomation[];
 
     // Filter for automation entities
     const automations: Automation[] = entities
@@ -109,7 +109,7 @@ export class HomeAssistantClient {
       throw new Error(`Failed to get automation ${automationId}: ${error.message}`);
     }
 
-    const entity: HAAutomation = await response.json();
+    const entity = await response.json() as HAAutomation;
 
     return {
       entity_id: entity.entity_id,
@@ -132,7 +132,7 @@ export class HomeAssistantClient {
         return false;
       }
 
-      const data = await response.json();
+      const data = await response.json() as { message: string };
       return data.message === 'API running.';
     } catch (error) {
       console.error('Failed to validate HA connection:', error);
@@ -187,7 +187,7 @@ export class HomeAssistantClient {
    */
   private async parseError(response: Response): Promise<HAApiError> {
     try {
-      const data = await response.json();
+      const data = await response.json() as { message?: string; code?: string };
       return {
         message: data.message || response.statusText,
         code: data.code,
