@@ -13,6 +13,7 @@ import { PersistentNotificationQueue } from './queue/persistentQueue.js';
 import { formatRelativeTime } from './utils/dateParser.js';
 import type { HomeAssistantClient } from './homeAssistant/client.js';
 import type { AutomationTriggerQueue } from './homeAssistant/automationQueue.js';
+import { PermissionManager } from './permissions.js';
 
 interface Command {
   data: any;
@@ -39,13 +40,15 @@ export class CommandHandler {
   private queue: PersistentNotificationQueue;
   private haClient: HomeAssistantClient | null = null;
   private haQueue: AutomationTriggerQueue | null = null;
+  private permissionManager: PermissionManager | null = null;
 
   constructor(
     client: Client,
     database: Database,
     queue: PersistentNotificationQueue,
     haClient?: HomeAssistantClient,
-    haQueue?: AutomationTriggerQueue
+    haQueue?: AutomationTriggerQueue,
+    permissionManager?: PermissionManager
   ) {
     this.commands = new Collection();
     this.client = client;
@@ -53,6 +56,7 @@ export class CommandHandler {
     this.queue = queue;
     this.haClient = haClient || null;
     this.haQueue = haQueue || null;
+    this.permissionManager = permissionManager || null;
 
     this.registerCommands();
   }
@@ -507,6 +511,14 @@ export class CommandHandler {
       execute: async (interaction: ChatInputCommandInteraction) => {
         await interaction.deferReply();
 
+        // Check user permission
+        if (this.permissionManager && !this.permissionManager.isUserAllowed(interaction.user.id)) {
+          await interaction.editReply({
+            content: '❌ You do not have permission to use this command.',
+          });
+          return;
+        }
+
         const automationId = interaction.options.getString('automation_id', true);
         const time = interaction.options.getString('time') || 'now';
         const notify = interaction.options.getBoolean('notify') ?? false;
@@ -828,6 +840,12 @@ export class CommandHandler {
 
       // Only handle automation_id autocomplete
       if (focusedOption.name !== 'automation_id') {
+        await interaction.respond([]);
+        return;
+      }
+
+      // Check user permission - prevent information disclosure
+      if (this.permissionManager && !this.permissionManager.isUserAllowed(interaction.user.id)) {
         await interaction.respond([]);
         return;
       }

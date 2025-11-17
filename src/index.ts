@@ -7,6 +7,8 @@ import { WebhookServer } from './webhook.js';
 import { CommandHandler } from './commands.js';
 import { createHAClientFromEnv } from './homeAssistant/client.js';
 import { AutomationTriggerQueue } from './homeAssistant/automationQueue.js';
+import { PermissionManager } from './permissions.js';
+import * as path from 'path';
 
 dotenv.config();
 
@@ -16,6 +18,7 @@ const WEBHOOK_PORT = parseInt(process.env.WEBHOOK_PORT || '5000');
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 const DATABASE_PATH = process.env.DATABASE_PATH || './data/bot.db';
 const SCHEDULER_INTERVAL = parseInt(process.env.QUEUE_SCHEDULER_INTERVAL || '30');
+const HA_PERMISSIONS_CONFIG = process.env.HA_PERMISSIONS_CONFIG || './config/ha-permissions.json';
 
 if (!TOKEN || !CHANNEL_ID) {
   console.error('Missing required environment variables: DISCORD_TOKEN and DISCORD_CHANNEL_ID');
@@ -46,6 +49,9 @@ let commandHandler: CommandHandler;
 
 // Initialize Home Assistant integration (optional)
 let haQueue: AutomationTriggerQueue | undefined;
+
+// Initialize permission manager
+let permissionManager: PermissionManager | undefined;
 
 // Event: Bot ready
 client.on(Events.ClientReady, async () => {
@@ -159,8 +165,15 @@ async function main() {
     scheduler = new NotificationScheduler(queue, database, haQueue);
     scheduler.start(SCHEDULER_INTERVAL);
 
+    // Initialize permission manager for HA commands
+    if (haClient) {
+      console.log('Initializing permission manager for HA commands...');
+      permissionManager = new PermissionManager(path.resolve(HA_PERMISSIONS_CONFIG));
+      console.log(`✅ Permission manager initialized (${permissionManager.getAllowedUserCount()} allowed user(s))`);
+    }
+
     // Initialize command handler (with optional HA integration)
-    commandHandler = new CommandHandler(client, database, queue, haClient || undefined, haQueue);
+    commandHandler = new CommandHandler(client, database, queue, haClient || undefined, haQueue, permissionManager);
 
     // Login to Discord
     console.log('Connecting to Discord...');
