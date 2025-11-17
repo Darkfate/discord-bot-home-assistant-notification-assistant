@@ -10,3 +10,6 @@ data/
 .idea/
 coverage/
 *.lcov
+
+# Permission config (contains user IDs)
+config/ha-permissions.json

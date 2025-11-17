@@ -568,6 +568,94 @@ Alternatively, use the autocomplete feature - just start typing in the `/ha-trig
 /ha-cancel id:5
 ```
 
+### Home Assistant Command Permissions
+
+For security, Home Assistant commands can be restricted to a whitelist of authorized Discord users. This prevents unauthorized users from triggering your home automations.
+
+#### Setup
+
+1. **Create the permissions config file:**
+   ```bash
+   cp config/ha-permissions.json.example config/ha-permissions.json
+   ```
+
+2. **Add authorized user IDs:**
+
+   Edit `config/ha-permissions.json`:
+   ```json
+   {
+     "allowedUsers": [
+       "123456789012345678",
+       "987654321098765432"
+     ]
+   }
+   ```
+
+3. **Get Discord User IDs:**
+   - Enable Developer Mode in Discord (User Settings → Advanced → Developer Mode)
+   - Right-click on a user and select "Copy User ID"
+   - Add the ID to the `allowedUsers` array
+
+4. **Restart the bot** (if running):
+   ```bash
+   # Docker
+   docker compose restart
+
+   # Local
+   npm run dev
+   ```
+
+#### How It Works
+
+- **Execution Protection**: Only whitelisted users can execute `/ha-trigger` and other HA commands
+- **Autocomplete Protection**: Unauthorized users won't see your automation IDs in autocomplete (prevents information disclosure)
+- **Hot-Reload**: The bot automatically reloads the config file when it changes—no restart needed!
+- **Fail-Secure**: If the config file is missing or invalid, all users are denied access
+
+#### Configuration Options
+
+**Environment Variables:**
+- `HA_PERMISSIONS_CONFIG`: Path to permissions config file (default: `./config/ha-permissions.json`)
+
+**Config File Format:**
+```json
+{
+  "allowedUsers": [
+    "user_id_1",
+    "user_id_2"
+  ]
+}
+```
+
+**Note:** The `config/ha-permissions.json` file is gitignored to prevent accidentally committing user IDs to version control.
+
+#### Testing
+
+1. **As an authorized user**: Try `/ha-trigger` - you should see autocomplete suggestions
+2. **As an unauthorized user**: Try `/ha-trigger` - no autocomplete suggestions, command execution denied
+3. **Check bot logs**: You'll see permission check messages on startup:
+   ```
+   [PermissionManager] Loaded 2 allowed user(s) for HA commands
+   ```
+
+#### Troubleshooting
+
+**No one can use HA commands:**
+- Check that `config/ha-permissions.json` exists
+- Verify the JSON syntax is valid
+- Ensure user IDs are strings (in quotes), not numbers
+- Check bot logs for permission manager errors
+
+**Commands not updating after config change:**
+- The bot should auto-reload the config file
+- If not, try restarting the bot
+- Check that file watching is enabled (it's on by default)
+
+**How to disable permission checks:**
+- Remove or rename the `config/ha-permissions.json` file
+- Note: This will deny ALL users by default (fail-secure behavior)
+- To allow all users, you would need to modify the code
+
 ## Database
 
 The bot uses SQLite to store:
@@ -732,6 +820,11 @@ npm run lint
 | `DATABASE_PATH` | Path to SQLite database | ❌ | ./data/bot.db |
 | `QUEUE_RETRY_BASE_DELAY` | Base retry delay (seconds) | ❌ | 60 |
 | `QUEUE_SCHEDULER_INTERVAL` | Scheduler check interval (seconds) | ❌ | 30 |
+| `HA_URL` | Home Assistant URL | ❌ | - |
+| `HA_ACCESS_TOKEN` | Home Assistant long-lived access token | ❌ | - |
+| `HA_VERIFY_SSL` | Verify SSL certificates | ❌ | true |
+| `HA_TIMEOUT` | Home Assistant API timeout (ms) | ❌ | 10000 |
+| `HA_PERMISSIONS_CONFIG` | Path to HA permissions config | ❌ | ./config/ha-permissions.json |
 
 ## Troubleshooting
 
