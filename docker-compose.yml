@@ -9,6 +9,14 @@ services:
       - WEBHOOK_SECRET=${WEBHOOK_SECRET}
       - DATABASE_PATH=/app/data/bot.db
       - LOG_LEVEL=info
+      # Queue Configuration
+      - QUEUE_RETRY_BASE_DELAY=${QUEUE_RETRY_BASE_DELAY:-60}
+      - QUEUE_SCHEDULER_INTERVAL=${QUEUE_SCHEDULER_INTERVAL:-30}
+      # Home Assistant Configuration (optional)
+      - HA_URL=${HA_URL}
+      - HA_ACCESS_TOKEN=${HA_ACCESS_TOKEN}
+      - HA_VERIFY_SSL=${HA_VERIFY_SSL:-true}
+      - HA_TIMEOUT=${HA_TIMEOUT:-10000}
     ports:
       - "5000:5000"  # Serves both webhook API and sandbox UI
     volumes:
