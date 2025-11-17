@@ -5,6 +5,8 @@ import { PersistentNotificationQueue } from './queue/persistentQueue.js';
 import { NotificationScheduler } from './queue/scheduler.js';
 import { WebhookServer } from './webhook.js';
 import { CommandHandler } from './commands.js';
+import { createHAClientFromEnv } from './homeAssistant/client.js';
+import { AutomationTriggerQueue } from './homeAssistant/automationQueue.js';
 
 dotenv.config();
 
@@ -41,6 +43,9 @@ let scheduler: NotificationScheduler;
 
 // Initialize command handler
 let commandHandler: CommandHandler;
+
+// Initialize Home Assistant integration (optional)
+let haQueue: AutomationTriggerQueue | undefined;
 
 // Event: Bot ready
 client.on(Events.ClientReady, async () => {
@@ -80,7 +85,11 @@ process.on('SIGINT', async () => {
     scheduler.stop();
   }
 
-  // Wait for queue to finish processing
+  // Wait for queues to finish processing
+  if (haQueue) {
+    await haQueue.shutdown();
+  }
+
   if (queue) {
     await queue.shutdown();
   }
@@ -101,6 +110,10 @@ process.on('SIGTERM', async () => {
 
   if (scheduler) {
     scheduler.stop();
+  }
+
+  if (haQueue) {
+    await haQueue.shutdown();
   }
 
   if (queue) {
@@ -124,12 +137,30 @@ async function main() {
     queue = new PersistentNotificationQueue(client, database, CHANNEL_ID!);
     await queue.initialize();
 
-    // Initialize scheduler
-    scheduler = new NotificationScheduler(queue, database);
+    // Initialize Home Assistant integration (optional)
+    const haClient = createHAClientFromEnv();
+    if (haClient) {
+      console.log('Initializing Home Assistant integration...');
+
+      // Test connection
+      const connected = await haClient.validateConnection();
+      if (connected) {
+        console.log('✅ Home Assistant connection validated');
+
+        // Initialize automation queue
+        haQueue = new AutomationTriggerQueue(client, database, haClient, CHANNEL_ID!);
+        await haQueue.initialize();
+      } else {
+        console.warn('⚠️  Failed to connect to Home Assistant - integration disabled');
+      }
+    }
+
+    // Initialize scheduler (with optional HA queue)
+    scheduler = new NotificationScheduler(queue, database, haQueue);
     scheduler.start(SCHEDULER_INTERVAL);
 
-    // Initialize command handler
-    commandHandler = new CommandHandler(client, database, queue);
+    // Initialize command handler (with optional HA integration)
+    commandHandler = new CommandHandler(client, database, queue, haClient || undefined, haQueue);
 
     // Login to Discord
     console.log('Connecting to Discord...');

@@ -5,11 +5,14 @@ import {
   SlashCommandBuilder,
   CommandInteraction,
   ChatInputCommandInteraction,
+  AutocompleteInteraction,
   EmbedBuilder,
 } from 'discord.js';
 import { Database, NotificationStatus, QueuedNotification } from './database.js';
 import { PersistentNotificationQueue } from './queue/persistentQueue.js';
 import { formatRelativeTime } from './utils/dateParser.js';
+import type { HomeAssistantClient } from './homeAssistant/client.js';
+import type { AutomationTriggerQueue } from './homeAssistant/automationQueue.js';
 
 interface Command {
   data: any;
@@ -34,16 +37,22 @@ export class CommandHandler {
   private client: Client;
   private database: Database;
   private queue: PersistentNotificationQueue;
+  private haClient: HomeAssistantClient | null = null;
+  private haQueue: AutomationTriggerQueue | null = null;
 
   constructor(
     client: Client,
     database: Database,
-    queue: PersistentNotificationQueue
+    queue: PersistentNotificationQueue,
+    haClient?: HomeAssistantClient,
+    haQueue?: AutomationTriggerQueue
   ) {
     this.commands = new Collection();
     this.client = client;
     this.database = database;
     this.queue = queue;
+    this.haClient = haClient || null;
+    this.haQueue = haQueue || null;
 
     this.registerCommands();
   }
@@ -460,6 +469,288 @@ export class CommandHandler {
         }
       },
     });
+
+    // ========================================================================
+    // Home Assistant Commands
+    // ========================================================================
+
+    // Skip HA commands if not configured
+    if (!this.haClient || !this.haQueue) {
+      console.log('[Commands] Home Assistant integration not configured, skipping HA commands');
+      return;
+    }
+
+    // ha-trigger command
+    this.commands.set('ha-trigger', {
+      data: new SlashCommandBuilder()
+        .setName('ha-trigger')
+        .setDescription('Trigger a Home Assistant automation')
+        .addStringOption((option) =>
+          option
+            .setName('automation_id')
+            .setDescription('Home Assistant automation entity ID')
+            .setRequired(true)
+            .setAutocomplete(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName('time')
+            .setDescription('When to trigger (e.g., "5m", "2h", "1d", "now")')
+            .setRequired(false)
+        )
+        .addBooleanOption((option) =>
+          option
+            .setName('notify')
+            .setDescription('Send Discord notification on completion')
+            .setRequired(false)
+        ),
+      execute: async (interaction: ChatInputCommandInteraction) => {
+        await interaction.deferReply();
+
+        const automationId = interaction.options.getString('automation_id', true);
+        const time = interaction.options.getString('time') || 'now';
+        const notify = interaction.options.getBoolean('notify') ?? false;
+
+        try {
+          // Get automation details (optional, for friendly name)
+          let automationName: string | undefined;
+          try {
+            const automation = await this.haClient!.getAutomation(automationId);
+            automationName = automation?.friendly_name;
+          } catch {
+            // Ignore - we'll proceed without friendly name
+          }
+
+          const triggerId = await this.haQueue!.enqueue({
+            automationId,
+            automationName,
+            scheduledFor: time,
+            triggeredBy: interaction.user.id,
+            notifyOnComplete: notify,
+          });
+
+          const scheduledDate = new Date(Date.now() + this.parseTimeToMs(time));
+          const displayName = automationName || automationId;
+
+          await interaction.editReply(
+            `✅ Automation trigger scheduled! (ID: ${triggerId})\n` +
+              `**Automation:** ${displayName}\n` +
+              `**When:** ${time === 'now' ? 'Immediately' : formatRelativeTime(scheduledDate)}\n` +
+              `**Notify:** ${notify ? 'Yes' : 'No'}`
+          );
+        } catch (error) {
+          await interaction.editReply(
+            `Failed to schedule automation trigger: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    // ha-scheduled command
+    this.commands.set('ha-scheduled', {
+      data: new SlashCommandBuilder()
+        .setName('ha-scheduled')
+        .setDescription('List scheduled automation triggers')
+        .addIntegerOption((option) =>
+          option
+            .setName('limit')
+            .setDescription('Number of results to show')
+            .setMinValue(1)
+            .setMaxValue(20)
+        ),
+      execute: async (interaction: ChatInputCommandInteraction) => {
+        await interaction.deferReply();
+
+        const limit = interaction.options.getInteger('limit') || 10;
+
+        try {
+          const triggers = await this.database.queryAutomationTriggers({
+            status: 'pending',
+            limit,
+            scheduledAfter: new Date(),
+          });
+
+          if (triggers.length === 0) {
+            await interaction.editReply('No scheduled automation triggers found.');
+            return;
+          }
+
+          const embed = new EmbedBuilder()
+            .setColor(DISCORD_COLORS.INFO)
+            .setTitle('📅 Scheduled Automation Triggers')
+            .setDescription(`Showing ${triggers.length} scheduled trigger(s)`)
+            .setTimestamp();
+
+          for (const trigger of triggers) {
+            const displayName = trigger.automationName || trigger.automationId;
+            embed.addFields({
+              name: `#${trigger.id} - ${displayName}`,
+              value:
+                `**Automation ID:** ${trigger.automationId}\n` +
+                `**Scheduled:** ${formatRelativeTime(trigger.scheduledFor)}\n` +
+                `**Triggered By:** <@${trigger.triggeredBy}>`,
+            });
+          }
+
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error) {
+          await interaction.editReply(
+            `Failed to retrieve scheduled triggers: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    // ha-cancel command
+    this.commands.set('ha-cancel', {
+      data: new SlashCommandBuilder()
+        .setName('ha-cancel')
+        .setDescription('Cancel a pending automation trigger')
+        .addIntegerOption((option) =>
+          option
+            .setName('id')
+            .setDescription('Trigger ID to cancel')
+            .setRequired(true)
+        ),
+      execute: async (interaction: ChatInputCommandInteraction) => {
+        await interaction.deferReply();
+
+        const id = interaction.options.getInteger('id', true);
+
+        try {
+          await this.haQueue!.cancelTrigger(id);
+          await interaction.editReply(`✅ Automation trigger #${id} has been cancelled.`);
+        } catch (error) {
+          await interaction.editReply(
+            `Failed to cancel trigger: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    // ha-history command
+    this.commands.set('ha-history', {
+      data: new SlashCommandBuilder()
+        .setName('ha-history')
+        .setDescription('View automation trigger history')
+        .addIntegerOption((option) =>
+          option
+            .setName('limit')
+            .setDescription('Number of results to show')
+            .setMinValue(1)
+            .setMaxValue(50)
+        )
+        .addStringOption((option) =>
+          option
+            .setName('status')
+            .setDescription('Filter by status')
+            .addChoices(
+              { name: 'All', value: 'all' },
+              { name: 'Pending', value: 'pending' },
+              { name: 'Triggered', value: 'triggered' },
+              { name: 'Failed', value: 'failed' }
+            )
+        ),
+      execute: async (interaction: ChatInputCommandInteraction) => {
+        await interaction.deferReply();
+
+        const limit = interaction.options.getInteger('limit') || 10;
+        const status = interaction.options.getString('status') || 'all';
+
+        try {
+          const triggers = await this.database.queryAutomationTriggers({
+            status: status as any,
+            limit,
+          });
+
+          if (triggers.length === 0) {
+            await interaction.editReply('No automation triggers found.');
+            return;
+          }
+
+          const embed = new EmbedBuilder()
+            .setColor(DISCORD_COLORS.INFO)
+            .setTitle('📜 Automation Trigger History')
+            .setDescription(`Showing ${triggers.length} trigger(s)${status !== 'all' ? ` (${status})` : ''}`)
+            .setTimestamp();
+
+          for (const trigger of triggers) {
+            const displayName = trigger.automationName || trigger.automationId;
+            const emoji = this.getStatusEmoji(trigger.status as any);
+
+            let value = `**Status:** ${emoji} ${trigger.status}\n` +
+              `**Scheduled:** ${trigger.scheduledFor.toLocaleString()}\n` +
+              `**Triggered By:** <@${trigger.triggeredBy}>`;
+
+            if (trigger.triggeredAt) {
+              value += `\n**Triggered At:** ${trigger.triggeredAt.toLocaleString()}`;
+            }
+
+            if (trigger.lastError) {
+              value += `\n**Error:** ${trigger.lastError.substring(0, 100)}`;
+            }
+
+            embed.addFields({
+              name: `#${trigger.id} - ${displayName}`,
+              value,
+            });
+          }
+
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error) {
+          await interaction.editReply(
+            `Failed to retrieve trigger history: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    // ha-test command
+    this.commands.set('ha-test', {
+      data: new SlashCommandBuilder()
+        .setName('ha-test')
+        .setDescription('Test Home Assistant connection'),
+      execute: async (interaction: ChatInputCommandInteraction) => {
+        await interaction.deferReply();
+
+        try {
+          const isConnected = await this.haClient!.validateConnection();
+
+          if (isConnected) {
+            // Try to list automations to verify access
+            const automations = await this.haClient!.listAutomations(false);
+
+            const embed = new EmbedBuilder()
+              .setColor(DISCORD_COLORS.SUCCESS)
+              .setTitle('✅ Home Assistant Connection OK')
+              .addFields(
+                {
+                  name: 'Status',
+                  value: 'Connected',
+                  inline: true,
+                },
+                {
+                  name: 'Automations Found',
+                  value: automations.length.toString(),
+                  inline: true,
+                }
+              )
+              .setTimestamp()
+              .setFooter({ text: 'Home Assistant' });
+
+            await interaction.editReply({ embeds: [embed] });
+          } else {
+            await interaction.editReply(
+              '❌ Failed to connect to Home Assistant. Please check your configuration.'
+            );
+          }
+        } catch (error) {
+          await interaction.editReply(
+            `❌ Error testing connection: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
   }
 
   private getStatusEmoji(status: NotificationStatus): string {
@@ -499,6 +790,13 @@ export class CommandHandler {
   }
 
   async handleInteraction(interaction: Interaction): Promise<void> {
+    // Handle autocomplete interactions
+    if (interaction.isAutocomplete()) {
+      await this.handleAutocomplete(interaction);
+      return;
+    }
+
+    // Handle command interactions
     if (!interaction.isCommand()) return;
 
     const command = this.commands.get(interaction.commandName);
@@ -517,6 +815,55 @@ export class CommandHandler {
         await interaction.editReply(reply);
       } else {
         await interaction.reply(reply);
+      }
+    }
+  }
+
+  /**
+   * Handle autocomplete interactions for Home Assistant automation IDs
+   */
+  private async handleAutocomplete(interaction: AutocompleteInteraction): Promise<void> {
+    try {
+      const focusedOption = interaction.options.getFocused(true);
+
+      // Only handle automation_id autocomplete
+      if (focusedOption.name !== 'automation_id') {
+        await interaction.respond([]);
+        return;
+      }
+
+      // Skip if HA client not available
+      if (!this.haClient) {
+        await interaction.respond([]);
+        return;
+      }
+
+      // Fetch automations from Home Assistant (with caching)
+      const automations = await this.haClient.listAutomations(true);
+
+      // Filter based on what user typed
+      const userInput = focusedOption.value.toLowerCase();
+      const filtered = automations
+        .filter(a =>
+          a.entity_id.toLowerCase().includes(userInput) ||
+          a.friendly_name.toLowerCase().includes(userInput)
+        )
+        .slice(0, 25); // Discord limit: 25 suggestions
+
+      // Respond with suggestions
+      await interaction.respond(
+        filtered.map(a => ({
+          name: `${a.friendly_name} (${a.entity_id})`.substring(0, 100), // Discord limit: 100 chars
+          value: a.entity_id,
+        }))
+      );
+    } catch (error) {
+      console.error('[Commands] Error handling autocomplete:', error);
+      // Respond with empty array on error
+      try {
+        await interaction.respond([]);
+      } catch {
+        // Ignore if already responded or timed out
       }
     }
   }

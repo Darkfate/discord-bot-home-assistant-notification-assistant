@@ -3,6 +3,12 @@ import { promisify } from 'util';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
+import type {
+  AutomationTrigger,
+  AutomationTriggerInput,
+  AutomationTriggerStatus,
+  AutomationTriggerQueryOptions,
+} from './homeAssistant/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -97,6 +103,33 @@ export class Database {
         last_update DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Home Assistant automation triggers
+    await run(`
+      CREATE TABLE IF NOT EXISTS ha_automation_triggers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        scheduled_for DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        triggered_at DATETIME,
+        automation_id TEXT NOT NULL,
+        automation_name TEXT,
+        status TEXT DEFAULT 'pending',
+        triggered_by TEXT NOT NULL,
+        retry_count INTEGER DEFAULT 0,
+        max_retries INTEGER DEFAULT 3,
+        last_error TEXT,
+        notification_id INTEGER,
+        notify_on_complete BOOLEAN DEFAULT 0,
+        FOREIGN KEY (notification_id) REFERENCES notifications(id)
+      )
+    `);
+
+    // Create indexes for efficient querying of automation triggers
+    await run('CREATE INDEX IF NOT EXISTS idx_ha_triggers_status ON ha_automation_triggers(status)');
+    await run('CREATE INDEX IF NOT EXISTS idx_ha_triggers_scheduled_for ON ha_automation_triggers(scheduled_for)');
+    await run('CREATE INDEX IF NOT EXISTS idx_ha_triggers_status_scheduled ON ha_automation_triggers(status, scheduled_for)');
+    await run('CREATE INDEX IF NOT EXISTS idx_ha_triggers_automation_id ON ha_automation_triggers(automation_id)');
+    await run('CREATE INDEX IF NOT EXISTS idx_ha_triggers_triggered_by ON ha_automation_triggers(triggered_by)');
   }
 
   private async migrateNotificationsTable(): Promise<void> {
@@ -619,6 +652,226 @@ export class Database {
         }
       );
     });
+  }
+
+  // ============================================================================
+  // Home Assistant Automation Trigger Operations
+  // ============================================================================
+
+  async saveAutomationTrigger(trigger: AutomationTriggerInput): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    // Parse scheduled time
+    let scheduledFor: Date;
+    if (trigger.scheduledFor instanceof Date) {
+      scheduledFor = trigger.scheduledFor;
+    } else if (typeof trigger.scheduledFor === 'string') {
+      scheduledFor = new Date(trigger.scheduledFor);
+    } else {
+      scheduledFor = new Date();
+    }
+
+    const maxRetries = trigger.maxRetries ?? 3;
+    const notifyOnComplete = trigger.notifyOnComplete ?? false;
+
+    return new Promise((resolve, reject) => {
+      this.db!.run(
+        `INSERT INTO ha_automation_triggers (
+          automation_id,
+          automation_name,
+          scheduled_for,
+          triggered_by,
+          max_retries,
+          notify_on_complete
+        ) VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          trigger.automationId,
+          trigger.automationName || null,
+          scheduledFor.toISOString(),
+          trigger.triggeredBy,
+          maxRetries,
+          notifyOnComplete ? 1 : 0,
+        ],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.lastID);
+        }
+      );
+    });
+  }
+
+  async getAutomationTrigger(id: number): Promise<AutomationTrigger | null> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    return new Promise((resolve, reject) => {
+      this.db!.get(
+        `SELECT * FROM ha_automation_triggers WHERE id = ?`,
+        [id],
+        (err, row: any) => {
+          if (err) reject(err);
+          else resolve(row ? this.rowToAutomationTrigger(row) : null);
+        }
+      );
+    });
+  }
+
+  async updateAutomationTriggerStatus(
+    id: number,
+    status: AutomationTriggerStatus,
+    error?: string
+  ): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const updates: string[] = ['status = ?'];
+    const params: any[] = [status];
+
+    if (status === 'triggered') {
+      updates.push('triggered_at = ?');
+      params.push(new Date().toISOString());
+    }
+
+    if (error) {
+      updates.push('last_error = ?');
+      params.push(error);
+    }
+
+    params.push(id);
+
+    return new Promise((resolve, reject) => {
+      this.db!.run(
+        `UPDATE ha_automation_triggers SET ${updates.join(', ')} WHERE id = ?`,
+        params,
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+  }
+
+  async incrementAutomationTriggerRetry(id: number): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    return new Promise((resolve, reject) => {
+      this.db!.run(
+        `UPDATE ha_automation_triggers SET retry_count = retry_count + 1 WHERE id = ?`,
+        [id],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+  }
+
+  async getDueAutomationTriggers(): Promise<AutomationTrigger[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const now = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(
+        `SELECT * FROM ha_automation_triggers
+         WHERE status = 'pending'
+         AND scheduled_for <= ?
+         ORDER BY scheduled_for ASC`,
+        [now],
+        (err, rows: any[]) => {
+          if (err) reject(err);
+          else resolve(rows.map(row => this.rowToAutomationTrigger(row)));
+        }
+      );
+    });
+  }
+
+  async queryAutomationTriggers(
+    options: AutomationTriggerQueryOptions = {}
+  ): Promise<AutomationTrigger[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const {
+      limit = 10,
+      offset = 0,
+      status,
+      triggeredBy,
+      automationId,
+      scheduledAfter,
+      scheduledBefore,
+    } = options;
+
+    let query = 'SELECT * FROM ha_automation_triggers WHERE 1=1';
+    const params: any[] = [];
+
+    if (status && status !== 'all') {
+      query += ' AND status = ?';
+      params.push(status);
+    }
+
+    if (triggeredBy) {
+      query += ' AND triggered_by = ?';
+      params.push(triggeredBy);
+    }
+
+    if (automationId) {
+      query += ' AND automation_id = ?';
+      params.push(automationId);
+    }
+
+    if (scheduledAfter) {
+      query += ' AND scheduled_for > ?';
+      params.push(scheduledAfter.toISOString());
+    }
+
+    if (scheduledBefore) {
+      query += ' AND scheduled_for < ?';
+      params.push(scheduledBefore.toISOString());
+    }
+
+    query += ' ORDER BY scheduled_for DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(query, params, (err, rows: any[]) => {
+        if (err) reject(err);
+        else resolve(rows.map(row => this.rowToAutomationTrigger(row)));
+      });
+    });
+  }
+
+  async linkAutomationTriggerToNotification(
+    triggerId: number,
+    notificationId: number
+  ): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    return new Promise((resolve, reject) => {
+      this.db!.run(
+        `UPDATE ha_automation_triggers SET notification_id = ? WHERE id = ?`,
+        [notificationId, triggerId],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+  }
+
+  private rowToAutomationTrigger(row: any): AutomationTrigger {
+    return {
+      id: row.id,
+      createdAt: new Date(row.created_at),
+      scheduledFor: new Date(row.scheduled_for),
+      triggeredAt: row.triggered_at ? new Date(row.triggered_at) : null,
+      automationId: row.automation_id,
+      automationName: row.automation_name,
+      status: row.status as AutomationTriggerStatus,
+      triggeredBy: row.triggered_by,
+      retryCount: row.retry_count,
+      maxRetries: row.max_retries,
+      lastError: row.last_error,
+      notificationId: row.notification_id,
+      notifyOnComplete: row.notify_on_complete === 1,
+    };
   }
 
   async close(): Promise<void> {

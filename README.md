@@ -6,14 +6,15 @@ A Discord bot designed for personal use with Home Assistant integration. Receive
 
 - **Persistent Queue**: All notifications are saved to database before sending - never lose a notification!
 - **Notification Scheduling**: Schedule notifications for future delivery (e.g., "send in 2 hours")
-- **Automatic Retries**: Failed notifications retry automatically with exponential backoff
+- **Home Assistant Automation Triggers**: Trigger HA automations from Discord with scheduling and autocomplete
+- **Automatic Retries**: Failed notifications and automation triggers retry automatically with exponential backoff
 - **Webhook API**: Receive notifications from Home Assistant or any service via HTTP POST
 - **RESTful Management**: Query, cancel, and retry notifications via API
-- **Comprehensive Slash Commands**: Manage notifications and view queue statistics directly in Discord
-- **SQLite Database**: Persistent storage of notification history, queue state, and bot settings
+- **Comprehensive Slash Commands**: Manage notifications, trigger automations, and view queue statistics directly in Discord
+- **SQLite Database**: Persistent storage of notification history, automation triggers, queue state, and bot settings
 - **Docker Support**: Easy containerization and deployment
 - **Webhook Security**: Optional signature verification for incoming webhooks
-- **Graceful Shutdown**: Bot waits for in-flight notifications before shutting down
+- **Graceful Shutdown**: Bot waits for in-flight notifications and automation triggers before shutting down
 
 ## Quick Start
 
@@ -339,6 +340,15 @@ curl "http://localhost:5000/webhook/notifications?search=door&limit=10"
 - `/failed [limit]`: Show failed notifications with error details
 - `/queue-stats`: Detailed queue statistics and health monitoring
 
+### Home Assistant Automation Control
+- `/ha-trigger <automation_id> [time] [notify]`: Trigger a Home Assistant automation (with autocomplete!)
+  - Example: `/ha-trigger automation_id:"automation.morning_routine" time:"now" notify:true`
+  - Example: `/ha-trigger automation_id:"automation.evening_lights" time:"6h"`
+- `/ha-test`: Test connection to Home Assistant
+- `/ha-scheduled [limit]`: List scheduled automation triggers
+- `/ha-cancel <id>`: Cancel a pending automation trigger
+- `/ha-history [limit] [status]`: View automation trigger history
+
 ## Notification Scheduling Examples
 
 ### Using Webhooks
@@ -454,6 +464,108 @@ rest_command:
         "message": "{{ message }}",
         "scheduled_for": "{{ scheduled_for }}"
       }
+```
+
+### Trigger Home Assistant Automations from Discord
+
+The bot can trigger Home Assistant automations directly from Discord commands, with support for scheduling and autocomplete.
+
+#### Setup
+
+1. **Get a Long-Lived Access Token from Home Assistant:**
+   - In Home Assistant, go to your profile (click your username in the bottom left)
+   - Scroll down to "Long-Lived Access Tokens"
+   - Click "Create Token"
+   - Give it a name like "Discord Bot"
+   - Copy the token (you won't be able to see it again!)
+
+2. **Add Home Assistant configuration to `.env`:**
+   ```bash
+   HA_URL=http://homeassistant.local:8123
+   HA_ACCESS_TOKEN=your_long_lived_access_token_here
+   HA_VERIFY_SSL=true
+   HA_TIMEOUT=10000
+   ```
+
+   **Note:** If you're running both the bot and Home Assistant in Docker, use the service name or container IP instead of `localhost`.
+
+3. **Restart the bot:**
+   ```bash
+   # Docker
+   docker compose restart
+
+   # Local
+   npm run dev
+   ```
+
+4. **Verify the connection:**
+   Use the `/ha-test` command in Discord to verify the bot can connect to Home Assistant.
+
+#### Discord Commands
+
+**`/ha-trigger`** - Trigger an automation immediately or at a scheduled time
+- `automation_id` (required): Home Assistant automation entity ID (with autocomplete!)
+- `time` (optional): When to trigger (e.g., "5m", "2h", "now") - default: "now"
+- `notify` (optional): Send Discord notification on completion - default: false
+
+Examples:
+```
+/ha-trigger automation_id:"automation.morning_routine" time:"now" notify:true
+/ha-trigger automation_id:"automation.evening_lights" time:"6h" notify:false
+/ha-trigger automation_id:"automation.water_plants" time:"2h" notify:true
+```
+
+**`/ha-test`** - Test Home Assistant connection
+- Validates connection and shows how many automations are available
+
+**`/ha-scheduled`** - List scheduled automation triggers
+- `limit` (optional): Number of results to show (1-20, default: 10)
+
+**`/ha-cancel`** - Cancel a pending automation trigger
+- `id` (required): Trigger ID to cancel
+
+**`/ha-history`** - View automation trigger history
+- `limit` (optional): Number of results to show (1-50, default: 10)
+- `status` (optional): Filter by status (all, pending, triggered, failed)
+
+#### Features
+
+- **Autocomplete**: Start typing an automation ID and the bot will suggest available automations with friendly names
+- **Scheduling**: Schedule automations to trigger at a future time (e.g., "turn on lights in 2 hours")
+- **Retry Logic**: Failed triggers automatically retry with exponential backoff (3 attempts)
+- **Optional Notifications**: Choose whether to receive a Discord notification when the automation triggers
+- **History Tracking**: View all past and scheduled automation triggers with timestamps and status
+
+#### Finding Automation IDs
+
+1. In Home Assistant, go to Settings → Automations & Scenes
+2. Click on the automation you want to trigger
+3. Click the three dots menu (⋮) in the top right
+4. Click "Rename"
+5. The Entity ID is shown below the name (e.g., `automation.morning_routine`)
+
+Alternatively, use the autocomplete feature - just start typing in the `/ha-trigger` command and the bot will suggest automations!
+
+#### Example Workflow
+
+```
+# Test the connection
+/ha-test
+
+# Trigger an automation immediately with notification
+/ha-trigger automation_id:"automation.morning_routine" time:"now" notify:true
+
+# Schedule an automation for later without notification
+/ha-trigger automation_id:"automation.evening_lights" time:"6h" notify:false
+
+# View scheduled triggers
+/ha-scheduled
+
+# View trigger history
+/ha-history limit:20 status:"all"
+
+# Cancel a scheduled trigger
+/ha-cancel id:5
 ```
 
 ## Database

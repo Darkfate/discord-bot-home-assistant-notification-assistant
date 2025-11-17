@@ -1,23 +1,30 @@
 /**
  * Notification Scheduler
  *
- * Periodically checks the database for due notifications and queues them for processing.
- * Handles scheduled notifications (future delivery).
+ * Periodically checks the database for due notifications and automation triggers,
+ * queuing them for processing. Handles scheduled notifications and automations (future delivery).
  */
 
 import { Database } from '../database.js';
 import { PersistentNotificationQueue } from './persistentQueue.js';
+import type { AutomationTriggerQueue } from '../homeAssistant/automationQueue.js';
 
 export class NotificationScheduler {
   private queue: PersistentNotificationQueue;
   private database: Database;
+  private automationQueue: AutomationTriggerQueue | null = null;
   private schedulerInterval: NodeJS.Timeout | null = null;
   private intervalSeconds: number = 30;
   private isRunning: boolean = false;
 
-  constructor(queue: PersistentNotificationQueue, database: Database) {
+  constructor(
+    queue: PersistentNotificationQueue,
+    database: Database,
+    automationQueue?: AutomationTriggerQueue
+  ) {
     this.queue = queue;
     this.database = database;
+    this.automationQueue = automationQueue || null;
   }
 
   /**
@@ -37,14 +44,14 @@ export class NotificationScheduler {
     console.log(`[Scheduler] Starting scheduler (checking every ${intervalSeconds}s)`);
 
     // Check immediately on start
-    this.checkDueNotifications().catch((err) => {
+    this.checkDueItems().catch((err) => {
       console.error('[Scheduler] Error during initial check:', err);
     });
 
     // Then check periodically
     this.schedulerInterval = setInterval(() => {
       if (this.isRunning) {
-        this.checkDueNotifications().catch((err) => {
+        this.checkDueItems().catch((err) => {
           console.error('[Scheduler] Error during scheduled check:', err);
         });
       }
@@ -61,6 +68,21 @@ export class NotificationScheduler {
       this.isRunning = false;
       console.log('[Scheduler] Scheduler stopped');
     }
+  }
+
+  /**
+   * Check for due items (notifications and automation triggers) and queue them for processing
+   *
+   * @returns Object with counts of notifications and automations queued
+   */
+  async checkDueItems(): Promise<{ notifications: number; automations: number }> {
+    const notificationCount = await this.checkDueNotifications();
+    const automationCount = await this.checkDueAutomationTriggers();
+
+    return {
+      notifications: notificationCount,
+      automations: automationCount,
+    };
   }
 
   /**
@@ -93,6 +115,45 @@ export class NotificationScheduler {
       return dueNotifications.length;
     } catch (error) {
       console.error('[Scheduler] Error checking for due notifications:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Check for due automation triggers and queue them for processing
+   *
+   * @returns Number of automation triggers queued
+   */
+  async checkDueAutomationTriggers(): Promise<number> {
+    // Skip if automation queue not available
+    if (!this.automationQueue) {
+      return 0;
+    }
+
+    try {
+      // Get all automation triggers that are due
+      const dueTriggers = await this.database.getDueAutomationTriggers();
+
+      if (dueTriggers.length > 0) {
+        console.log(`[Scheduler] Found ${dueTriggers.length} due automation trigger(s)`);
+
+        // Process each due trigger
+        for (const trigger of dueTriggers) {
+          try {
+            await this.automationQueue.processTrigger(trigger.id);
+          } catch (error) {
+            console.error(
+              `[Scheduler] Error processing automation trigger ${trigger.id}:`,
+              error
+            );
+            // Continue processing other triggers even if one fails
+          }
+        }
+      }
+
+      return dueTriggers.length;
+    } catch (error) {
+      console.error('[Scheduler] Error checking for due automation triggers:', error);
       return 0;
     }
   }
