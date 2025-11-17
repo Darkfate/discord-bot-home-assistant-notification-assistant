@@ -8,12 +8,13 @@
 2. **Update existing tests** - Modify tests affected by the changes
 3. **Write new tests** - Add comprehensive test coverage for new functionality
 4. **Implement the feature** - Write the actual code
-5. **Verify TypeScript compilation** - Run `npm run build` in all project directories
-6. **Remove unused imports** - Clean up all unused code and imports
-7. **Verify coverage** - Ensure code coverage thresholds are met
-8. **Verify package-lock.json** - Ensure lock files exist for all package.json files
-9. **Document the feature** - Add clear usage instructions
-10. **Commit and push** - Include tests and documentation in the commit
+5. **Update Docker configuration** - If feature requires config files or new environment variables (see Docker Configuration section)
+6. **Verify TypeScript compilation** - Run `npm run build` in all project directories
+7. **Remove unused imports** - Clean up all unused code and imports
+8. **Verify coverage** - Ensure code coverage thresholds are met
+9. **Verify package-lock.json** - Ensure lock files exist for all package.json files
+10. **Document the feature** - Add clear usage instructions
+11. **Commit and push** - Include tests and documentation in the commit
 
 **No feature is complete without tests, clean TypeScript compilation, AND documentation.**
 
@@ -1008,18 +1009,284 @@ Good documentation:
 
 ---
 
+## Docker Configuration
+
+**When implementing features that require configuration files or environment variables, Docker configuration MUST be updated.**
+
+### When to Update Docker Configuration
+
+Update Docker-related files when your feature:
+
+- **Requires configuration files** (e.g., JSON, YAML, INI files)
+- **Adds new environment variables** that need to be passed to the container
+- **Needs persistent storage** beyond the existing data directory
+- **Requires mounted volumes** for config or other files
+
+### Docker Configuration Checklist
+
+When adding features with configuration needs:
+
+#### 1. Create Config Directory Structure
+
+```bash
+# Create config directory if it doesn't exist
+mkdir -p config
+
+# Create example config file
+# config/feature-config.json.example
+{
+  "setting1": "example_value",
+  "setting2": true
+}
+
+# Create default config (if safe defaults exist)
+# config/feature-config.json
+{
+  "setting1": "default_value",
+  "setting2": false
+}
+```
+
+#### 2. Update .gitignore
+
+**Always gitignore config files that contain sensitive data:**
+
+```gitignore
+# Permission config (contains user IDs)
+config/ha-permissions.json
+
+# Sensitive config files
+config/secrets.json
+config/*.key
+```
+
+**Keep example files in git:**
+- ✅ `config/feature-config.json.example` - Committed to git
+- ❌ `config/feature-config.json` - Gitignored (user-specific)
+
+#### 3. Update docker-compose.yml
+
+**Add environment variables:**
+
+```yaml
+services:
+  discord-bot:
+    environment:
+      # Your new environment variables
+      - FEATURE_CONFIG_PATH=${FEATURE_CONFIG_PATH:-/app/config/feature-config.json}
+      - FEATURE_ENABLED=${FEATURE_ENABLED:-false}
+```
+
+**Add volume mounts:**
+
+```yaml
+services:
+  discord-bot:
+    volumes:
+      - ./data:/app/data           # Existing
+      - ./config:/app/config       # Add this if not present
+      - ./logs:/app/logs           # Example: if feature needs logs directory
+```
+
+#### 4. Update .env.example
+
+**Document new environment variables:**
+
+```bash
+# Feature Name Configuration (optional)
+FEATURE_CONFIG_PATH=./config/feature-config.json  # Path to feature config
+FEATURE_ENABLED=false                              # Enable/disable feature (default: false)
+FEATURE_TIMEOUT=5000                               # Feature timeout in ms (default: 5000)
+```
+
+**Include helpful comments:**
+- What the variable does
+- Default value
+- Whether it's required or optional
+- Valid values or format
+
+#### 5. Update setup.sh
+
+**Add directory creation and config initialization:**
+
+```bash
+# Create config directory if it doesn't exist
+if [ ! -d "config" ]; then
+    echo "Creating config directory..."
+    mkdir -p config
+    echo "✓ Config directory created"
+else
+    echo "✓ Config directory already exists"
+fi
+
+# Copy example config if it doesn't exist
+if [ ! -f "config/feature-config.json" ]; then
+    if [ -f "config/feature-config.json.example" ]; then
+        echo "Copying feature config example file..."
+        cp config/feature-config.json.example config/feature-config.json
+        echo "✓ Created config/feature-config.json (edit this file to configure feature)"
+    fi
+else
+    echo "✓ config/feature-config.json already exists"
+fi
+```
+
+#### 6. Update README.md Docker Instructions
+
+**Add setup steps in the Docker deployment section:**
+
+```markdown
+#### Option B: Run with Docker Compose
+
+1. **Initialize data and config directories**:
+   ```bash
+   ./setup.sh
+   ```
+   Or manually:
+   ```bash
+   mkdir -p data
+   mkdir -p config
+   ```
+
+2. **(Optional) Configure Feature Name**:
+   If using Feature Name, create the config file:
+   ```bash
+   cp config/feature-config.json.example config/feature-config.json
+   # Edit config/feature-config.json with your settings
+   ```
+
+3. **Start with Docker Compose**:
+   ```bash
+   docker compose up --build -d
+   ```
+```
+
+### Example: HA Permissions Feature
+
+**Complete example of Docker configuration for the HA permissions feature:**
+
+1. **Created files:**
+   - `config/ha-permissions.json.example` - Template
+   - `config/ha-permissions.json` - User config (gitignored)
+
+2. **Updated docker-compose.yml:**
+   ```yaml
+   environment:
+     - HA_PERMISSIONS_CONFIG=${HA_PERMISSIONS_CONFIG:-/app/config/ha-permissions.json}
+   volumes:
+     - ./config:/app/config
+   ```
+
+3. **Updated .env.example:**
+   ```bash
+   HA_PERMISSIONS_CONFIG=./config/ha-permissions.json
+   ```
+
+4. **Updated setup.sh:**
+   ```bash
+   mkdir -p config
+   cp config/ha-permissions.json.example config/ha-permissions.json
+   ```
+
+5. **Updated README.md:**
+   - Added optional setup step for HA permissions
+   - Documented how to configure permissions before starting container
+
+### Docker Configuration Best Practices
+
+#### Environment Variables
+
+**Default values:**
+- ✅ Always provide sensible defaults in docker-compose.yml
+- ✅ Use `${VAR:-default}` syntax for optional variables
+- ❌ Don't require environment variables that have safe defaults
+
+**Path variables:**
+- ✅ Use absolute paths inside container (`/app/config/file.json`)
+- ✅ Use relative paths in .env.example (`./config/file.json`)
+- ✅ Document both container and host paths
+
+#### Volume Mounts
+
+**Organization:**
+- ✅ Mount config directories separately from data directories
+- ✅ Keep persistent data in `./data` mount
+- ✅ Keep configuration in `./config` mount
+- ❌ Don't mix different types of files in the same mount
+
+**Permissions:**
+- ✅ Let container handle permissions via entrypoint script
+- ✅ Document any permission requirements
+- ❌ Don't rely on host system permissions
+
+#### Config Files
+
+**Security:**
+- ✅ Always gitignore files containing sensitive data
+- ✅ Provide example files with dummy/safe values
+- ✅ Document what data is sensitive
+- ❌ Never commit real credentials or user data
+
+**Defaults:**
+- ✅ Fail-secure: deny by default if config is missing
+- ✅ Validate config file format on startup
+- ✅ Log clear error messages if config is invalid
+- ❌ Don't silently ignore invalid configs
+
+### Testing Docker Configuration
+
+**Before committing, verify:**
+
+```bash
+# 1. Run setup script
+./setup.sh
+
+# 2. Verify directories created
+ls -la data/ config/
+
+# 3. Verify config files created
+ls -la config/
+
+# 4. Test Docker build
+docker compose build
+
+# 5. Test Docker startup
+docker compose up -d
+
+# 6. Check logs for config loading
+docker compose logs
+
+# 7. Verify feature works in container
+# (Test the actual feature)
+
+# 8. Clean up test
+docker compose down
+```
+
+### Common Issues
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Config file not found | Volume not mounted | Add volume mount in docker-compose.yml |
+| Permission denied | Container can't write to mounted volume | Check volume mount and entrypoint script |
+| Environment variable not set | Not defined in docker-compose.yml | Add to environment section |
+| Config not loaded | Wrong path in container | Use absolute path inside container |
+
+---
+
 ## Summary
 
-**Remember: Code without tests, clean builds, AND documentation is incomplete code.**
+**Remember: Code without tests, clean builds, Docker configuration, AND documentation is incomplete code.**
 
 Every feature, bug fix, and modification must include:
 1. **Comprehensive tests** - Unit, integration, error handling, and edge cases
 2. **Updated test coverage** - Modify existing tests and add new ones
 3. **Clean TypeScript compilation** - No errors, no unused imports, verified builds in all directories
 4. **Valid package-lock.json files** - Present for all package.json files
-5. **Clear documentation** - Usage instructions, examples, and API docs
+5. **Docker configuration** - Updated docker-compose.yml, .env.example, setup.sh if feature requires config files or env vars
+6. **Clear documentation** - Usage instructions, examples, and API docs
 
-**The feature is not done until it has tests, compiles cleanly, and has documentation.**
+**The feature is not done until it has tests, compiles cleanly, has Docker configuration (if needed), and has documentation.**
 
 ### Quick Pre-Commit Checklist
 
